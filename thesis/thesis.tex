@@ -22,6 +22,7 @@
 \usepackage{appendix}                 % Appendix
 \usepackage{booktabs}                 % Professional-quality tables
 \usepackage{caption}                  % Captions
+\usepackage{csquotes}                 % Context sensitive quotation facilities
 \usepackage{float}                    % Float control
 \usepackage{geometry}                 % Easily define margins
 \usepackage{graphicx}                 % Graphic materials (e.g., images)
@@ -51,7 +52,14 @@
 % Add the bibliography database.
 \addbibresource{bibliography.bib}
 
+% Build the Nomenclature package.
+\makenomenclature
+
+\makeindex
 \begin{document}
+
+% Load the nomenclature.
+\input{nomenclature}
 
 % Start front matter.
 \frontmatter
@@ -61,8 +69,8 @@
 \input{head/preface}
 \input{head/abstract}
 \input{head/summary}
-\makenomenclature
 \tableofcontents
+\printnomenclature
 
 % Start main matter.
 \mainmatter

@@ -11,6 +11,7 @@ rm master_thesis_joeri_hermans.pdf
 mkdir output
 # Compile the thesis and write the output files.
 pdflatex thesis
+makeindex thesis.nlo -s nomencl.ist -o thesis.nls
 bibtex thesis
 pdflatex thesis
 pdflatex thesis
@@ -27,4 +28,10 @@ mv thesis.bcf output
 mv thesis-blx.bib output
 mv thesis.dvi output
 mv thesis.run.xml output
+mv thesis.fdb_latexmk output
+mv thesis.idx output
+mv thesis.ilg output
+mv thesis.ind output
+mv thesis.fls output
+mv thesis.nls output
 mv bibliography.log output
