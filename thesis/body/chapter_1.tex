@@ -7,8 +7,24 @@
 %
 % Released under an MIT license. Share, modify and enjoy, but quote the author!
 
-\chapter[Introduction]{Introduction}
+\chapter{Introduction}
 \label{chapter:introduction}
 
+In this chapter we will give an introduction to Distributed Deep Learning and the problems surrounding it. A more detailed description of the subject of study is given in Chapter~\ref{chapter:distributed_deep_learning}. Furthermore, we make the reader more comfortable with the notation and abbreviations used throughout this thesis. Finally, we formally define the problem statement in Section~\ref{sec:problem_statement}, and give an outline of this thesis in Section~\ref{sec:thesis_outline}.
 
-Unsupervised feature learning and deep learning has shown that being able to train large models can drastically improve performance. However, consider the problem of training a deep network with millions or even billions of parameters. How do we achieve this without waiting for days, or even weeks? Dean et al.~propose a different training paradigm which allows us to train and serve a model on multiple physical machines~\cite{dean2012large}.
+\section[Distributed Deep Learning]{Distributed Deep Learning, an introduction}
+\label{sec:intro_distributed_deep_learning}
+
+Unsupervised feature learning and deep learning has shown that being able to train large models can drastically improve model performance. However, consider the problem of training a deep network with millions or even billions of parameters. How do we achieve this without waiting for days, or even weeks? Dean et al.~propose a different training paradigm which allows us to train and serve a model on multiple physical machines~\cite{dean2012large}. The authors propose two novel methodologies to distribute stochastic gradient descent.
+
+\subsection{Model Parallelism}
+\label{sec:intro_model_parallelism}
+
+\subsection{Data Parallelism}
+\label{sec:intro_data_parallelism}
+
+\section{Problem Statement}
+\label{sec:problem_statement}
+
+\section{Thesis Outline}
+\label{sec:thesis_outline}
