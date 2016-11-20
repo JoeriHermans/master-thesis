@@ -19,6 +19,7 @@
 \usepackage{amsfonts}                 % Blackboard math symbols
 \usepackage{amsmath}                  % AMS Math
 \usepackage{amssymb}                  % AMS Symbols
+\usepackage{appendix}                 % Appendix
 \usepackage{booktabs}                 % Professional-quality tables
 \usepackage{caption}                  % Captions
 \usepackage{float}                    % Float control
@@ -73,5 +74,11 @@
 \addcontentsline{toc}{chapter}{References}
 % Draw the bibliography.
 \printbibliography
+
+% Start appendices.
+\appendix
+\appendixpage
+\noappendicestocpagenum
+\addappheadtotoc
 
 \end{document}
