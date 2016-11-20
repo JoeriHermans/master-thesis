@@ -11,24 +11,24 @@
 
 % Define the packages.
 % Packages are mostly based on the NIPS (Neural Information Processing Systems) requirements.
-\usepackage[T1]{fontenc}             % Use 8-bit T1 fonts
-\usepackage[english]{babel}          % Set English as main language
-\usepackage[intoc, english]{nomencl} % Nomenclature
-\usepackage[utf8]{inputenc}          % Allow utf-8 input
-\usepackage{amsfonts}                % Blackboard math symbols
-\usepackage{amsmath}                 % AMS Math
-\usepackage{amssymb}                 % AMS Symbols
-\usepackage{apacite}                 % APA citing style.
-\usepackage{booktabs}                % Professional-quality tables
-\usepackage{caption}                 % Captions
-\usepackage{float}                   % Float control
-\usepackage{geometry}                % Easily define margins
-\usepackage{graphicx}                % Graphic materials (e.g., images)
-\usepackage{hyperref}                % Hyperlinks
-\usepackage{microtype}               % Microtypography
-\usepackage{rotating}                % Allow page rotation (e.g., for large table)
-\usepackage{tikz}                    % Drawings
-\usepackage{url}                     % Simple URL typesetting
+\usepackage[T1]{fontenc}              % Use 8-bit T1 fonts
+\usepackage[backend=bibtex]{biblatex} % Citing
+\usepackage[english]{babel}           % Set English as main language
+\usepackage[intoc, english]{nomencl}  % Nomenclature
+\usepackage[utf8]{inputenc}           % Allow utf-8 input
+\usepackage{amsfonts}                 % Blackboard math symbols
+\usepackage{amsmath}                  % AMS Math
+\usepackage{amssymb}                  % AMS Symbols
+\usepackage{booktabs}                 % Professional-quality tables
+\usepackage{caption}                  % Captions
+\usepackage{float}                    % Float control
+\usepackage{geometry}                 % Easily define margins
+\usepackage{graphicx}                 % Graphic materials (e.g., images)
+\usepackage{hyperref}                 % Hyperlinks
+\usepackage{microtype}                % Microtypography
+\usepackage{rotating}                 % Allow page rotation (e.g., for large table)
+\usepackage{tikz}                     % Drawings
+\usepackage{url}                      % Simple URL typesetting
 
 % Define page structure using Geometry.
 % For printing, set right to 35mm
@@ -47,8 +47,12 @@
 % Load the macros.
 \input{utils/macros.tex}
 
+% Add the bibliography database.
+\addbibresource{bibliography.bib}
+
 \begin{document}
 
+% Start front matter.
 \frontmatter
 \let\cleardoublepage\clearpage
 \input{head/cover_page}
@@ -59,8 +63,15 @@
 \makenomenclature
 \tableofcontents
 
+% Start main matter.
 \mainmatter
-\input{body/introduction}
 \input{body/chapter_1}
+
+% Force the bibliography on a new page.
+\clearpage
+% Add the references to the table of contents.
+\addcontentsline{toc}{chapter}{References}
+% Draw the bibliography.
+\printbibliography
 
 \end{document}

@@ -10,8 +10,10 @@ rm master_thesis_joeri_hermans.pdf
 # Create a new output file.
 mkdir output
 # Compile the thesis and write the output files.
-pdflatex thesis.tex
-pdflatex thesis.tex
+pdflatex thesis
+bibtex thesis
+pdflatex thesis
+pdflatex thesis
 # Move all files to the output directory.
 mv thesis.aux output
 mv thesis.log output
@@ -19,3 +21,10 @@ mv thesis.nlo output
 mv thesis.pdf master_thesis_joeri_hermans.pdf
 mv thesis.out output
 mv thesis.toc output
+mv thesis.blg output
+mv thesis.bbl output
+mv thesis.bcf output
+mv thesis-blx.bib output
+mv thesis.dvi output
+mv thesis.run.xml output
+mv bibliography.log output
