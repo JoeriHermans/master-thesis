@@ -1,0 +1,66 @@
+% Maastricht University Thesis Template
+%
+% Developed for my Master Thesis at Maastricht University.
+% Based on Eugenio Senes's template at the University of Torino.
+%
+% By Joeri Hermans (joeri@joerihermans.com)
+%
+% Released under an MIT license. Share, modify and enjoy, but quote the author!
+
+\documentclass[10pt, a4paper, oneside]{book}
+
+% Define the packages.
+% Packages are mostly based on the NIPS (Neural Information Processing Systems) requirements.
+\usepackage[T1]{fontenc}             % Use 8-bit T1 fonts
+\usepackage[english]{babel}          % Set English as main language
+\usepackage[utf8]{inputenc}          % Allow utf-8 input
+\usepackage{amsfonts}                % Blackboard math symbols
+\usepackage{amsmath}                 % AMS Math
+\usepackage{amssymb}                 % AMS Symbols
+\usepackage{apacite}                 % APA citing style.
+\usepackage{booktabs}                % Professional-quality tables
+\usepackage{caption}                 % Captions
+\usepackage{float}                   % Float control
+\usepackage{geometry}                % Easily define margins
+\usepackage{graphicx}                % Graphic materials (e.g., images)
+\usepackage{hyperref}                % Hyperlinks
+\usepackage{microtype}               % Microtypography
+\usepackage{rotating}                % Allow page rotation (e.g., for large table)
+\usepackage{tikz}                    % Drawings
+\usepackage{url}                     % Simple URL typesetting
+\usepackage{nomencl} % Nomenclature
+
+% Define page structure using Geometry.
+% For printing, set right to 35mm
+\geometry{a4paper, portrait, left=35mm, right=20mm, top=35mm, bottom=30mm}
+
+% Define the core properties of your thesis.
+\title{Distributed Deep Learning}                                     % Title of the thesis
+\author{Joeri R.~Hermans}                                             % Author name
+\date{\today}                                                         % Publishing date
+\def \university{Maastricht University}                               % University name
+\def \universitycity{Maastricht}                                      % University city
+\def \universitycountry{The Netherlands}                              % University country
+\def \faculty{Faculty of Humanities and Sciences}                     % Faculty
+\def \department{Department of Data Science \& Knowledge Engineering} % Department name
+
+% Load the macros.
+\input{utils/macros.tex}
+
+\begin{document}
+
+\frontmatter
+\let\cleardoublepage\clearpage
+\input{head/cover_page}
+%\input{head/dedication}
+\input{head/preface}
+\input{head/abstract}
+\input{head/summary}
+\makenomenclature
+\tableofcontents
+
+\mainmatter
+\input{body/introduction}
+\input{body/chapter_1}
+
+\end{document}

@@ -1,0 +1,31 @@
+% Macro definitions for the Maastricht University Thesis Template.
+%
+% Developed for my Master Thesis at Maastricht University.
+% Based on Eugenio Senes's template at the University of Torino.
+%
+% By Joeri Hermans (joeri@joerihermans.com)
+%
+% Released under an MIT license. Share, modify and enjoy, but quote the author!
+
+\makeatletter
+
+\newcommand{\makethesistitle}{
+  % Draw the title.
+  \begin{center}
+    {\large \bf \textsc{\@title}}
+  \end{center}
+  % Draw the author.
+  \center \small \@author
+}
+
+\newcommand{\makeinstitution}{
+  \begin{center}
+    \small
+        {\university}\\
+        {\faculty}\\
+        {\department}\\
+        {\universitycity, \universitycountry}
+  \end{center}
+}
+
+\makeatother
