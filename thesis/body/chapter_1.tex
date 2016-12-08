@@ -75,7 +75,7 @@ Let us start with a simple example in order to illustrate this concept more clea
     \draw[rounded corners=3pt] (2.6,0.4) rectangle ++(0.8,-0.8);
     \draw[rounded corners=3pt] (-0.4,-1.05) rectangle ++(0.8,-0.8);
   \end{tikzpicture}
-  \caption{A perceptron partitioned using the \emph{model parallelism} paradigm. In this approach every node is responsible for accepting the input $x_i$ from some particular source, and multiplying the input with the associated weight $w_i$. After the multiplication, the result is sent to the node which is responsible for computing $y$. Of course, this node requires a synchronization mechanism to ensure that the result is consistent. The synchronization mechanism does this by waiting by waiting for the results \emph{it} depends on.}
+  \caption{A perceptron partitioned using the \emph{model parallelism} paradigm. In this approach every input node is responsible for accepting the input $x_i$ from some source, and multiplying the input with the associated weight $w_i$. After the multiplication, the result is sent to the node which is responsible for computing $y$. Of course, this node requires a synchronization mechanism to ensure that the result is consistent. The synchronization mechanism does this by waiting for the results $y$ depends on.}
   \label{fig:introduction_model_parallelism_perceptron}
 \end{figure}
 
