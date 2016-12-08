@@ -82,7 +82,16 @@ Let us start with a simple example in order to illustrate this concept more clea
 \subsection{Data Parallelism}
 \label{sec:intro_data_parallelism}
 
-In this thesis, we focus our efforts on data parallelism. Data parallelism is an inherently different methodology of optimizing parameters. Whereas, in model parallelism, the procedure of the optimization algorithm is still identical.
+In this thesis, we focus our efforts on data parallelism. Data parallelism is an inherently different methodology of optimizing parameters. The general idea is to reduce the training time by having $n$ different workers optimizing a model by processing $n$ different shards (partition) of the dataset in parallel~\cite{dean2012large}. In this setting we distribute $n$ model replicas over $n$ processing nodes, i.e., every node (or process) holds one model replica. Then, we let the workers train their local replica using their own data shard. However, it is possible to coordinate the workers in such a way that, together, they will optimize a single objective. There are several approaches to achieve this, and these will be discussed in greater detail in Chapter~\ref{chapter:distributed_deep_learning}.\\
+
+Nevertheless, a popular approach is to employ a \emph{parameter server}~\cite{dean2012large, zhang2015deep, recht2011hogwild}.
+
+\begin{figure}[H]
+  \begin{tikzpicture}
+  \end{tikzpicture}
+  \caption{}
+  \label{fig:introduction_data_parallelism_schematic}
+\end{figure}
 
 \section{Optimization algorithms}
 \label{sec:intro_optimization_algorithms}
