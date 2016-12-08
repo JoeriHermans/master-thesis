@@ -84,7 +84,7 @@ Let us start with a simple example in order to illustrate this concept more clea
 
 In this thesis, we focus our efforts on data parallelism. Data parallelism is an inherently different methodology of optimizing parameters. The general idea is to reduce the training time by having $n$ different workers optimizing a model by processing $n$ different shards (partition) of the dataset in parallel~\cite{dean2012large}. In this setting we distribute $n$ model replicas over $n$ processing nodes, i.e., every node (or process) holds one model replica. Then, we let the workers train their local replica using their own data shard. However, it is possible to coordinate the workers in such a way that, together, they will optimize a single objective. There are several approaches to achieve this, and these will be discussed in greater detail in Chapter~\ref{chapter:distributed_deep_learning}.\\
 
-Nevertheless, a popular approach is to employ a \emph{parameter server}~\cite{dean2012large, zhang2015deep, recht2011hogwild}.
+Nevertheless, a popular approach to optimize this objective, is to employ a centralized \emph{parameter server}~\cite{dean2012large, zhang2015deep, recht2011hogwild}. A parameter server is responsible for orchestrating model updates coming from different workers. It does this by incorperating gradient updates (albeit, in an non-naive way) of the workers into a model which was replicated to the workers.
 
 \begin{figure}[H]
   \begin{tikzpicture}
@@ -92,18 +92,6 @@ Nevertheless, a popular approach is to employ a \emph{parameter server}~\cite{de
   \caption{}
   \label{fig:introduction_data_parallelism_schematic}
 \end{figure}
-
-\section{Optimization algorithms}
-\label{sec:intro_optimization_algorithms}
-
-\subsection{Gradient Descent}
-\label{sec:gradient_descent}
-
-\subsection{Evolutionary Optimization}
-\label{sec:evolutionary_optimization}
-
-\subsection{Particle Filters}
-\label{sec:particle_filters}
 
 \section{Problem Statement}
 \label{sec:problem_statement}
