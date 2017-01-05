@@ -98,8 +98,8 @@
     \draw[dashed, draw=black!30] (5,0.25) -- (5,1.55);
     % Draw the gradients and the elastic force.
     \draw[->] (5.45,1.8) -- (6.1,1.8) node[right, above] {\small $\nabla f_w$};
-    \draw[->] (4.55,1.55) -- (4.2,1.55) node[midway, below] {\small $\eta\rho(\theta_w - \theta_C)$ (small $\rho$)};
-    \draw[->] (4.55,2.05) -- (3.6,2.05) node[midway, above] {\small $\eta\rho(\theta_w - \theta_C)$ (large $\rho$)};
+    \draw[->] (4.55,1.55) -- (4.2,1.55) node[midway, below] {\small $-\eta\rho(\theta_w - \theta_C)$ (small $\rho$)};
+    \draw[->] (4.55,2.05) -- (3.6,2.05) node[midway, above] {\small $-\eta\rho(\theta_w - \theta_C)$ (large $\rho$)};
   \end{tikzpicture}
   \caption{EASGD Caption here}
 \end{figure}
