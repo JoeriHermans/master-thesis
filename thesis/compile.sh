@@ -10,11 +10,11 @@ rm master_thesis_joeri_hermans.pdf
 # Create a new output file.
 mkdir output
 # Compile the thesis and write the output files.
-pdflatex thesis
+pdflatex thesis -shell-escape
 makeindex thesis.nlo -s nomencl.ist -o thesis.nls
 bibtex thesis
-pdflatex thesis
-pdflatex thesis
+pdflatex thesis -shell-escape
+pdflatex thesis -shell-escape
 # Move all files to the output directory.
 mv thesis.aux output
 mv thesis.log output

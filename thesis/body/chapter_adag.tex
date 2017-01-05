@@ -7,5 +7,37 @@
 %
 % Released under an MIT license. Share, modify and enjoy, but quote the author!
 
-\chapter{Asynchronous Distributed Adaptive Gradient}
-\label{chapter:asynchronous_distributed_adaptive_gradient}
+\chapter{Asynchronous Distributed Adaptive Gradients}
+\label{chapter:asynchronous_distributed_adaptive_gradients}
+
+In this chapter we introduce a novel optimizer called \textsc{Adag}. \textsc{Adag}, or \emph{Asynchronous Distributed Adaptive Gradients}, is an optimization process designed with data parallel methods in mind. We build upon previous work~\cite{dean2012large,hadjis2016omnivore,kingma2014adam,zhang2015deep} and incorperate new insights backed up by theory and experimental evidence. We start in Section~\ref{sec:adag_problem_setting} by formalizing the problem setting. In Section~\ref{sec:adag_previous_work}, we summarize previous work on distributed (data parallel) optimization. Section~\ref{sec:adag_algorithm} will describe our algorithm in detail, supported by intuition and theory. Finally, we experimentally show the effectiveness of our approach in Section~\ref{sec:adag_experiments} and give some points for future work in Section~\ref{sec:adag_future_work}.
+
+\section{Problem setting}
+\label{sec:adag_problem_setting}
+
+\section{Previous work}
+\label{sec:adag_previous_work}
+
+\section{Algorithm}
+\label{sec:adag_algorithm}
+
+\subsection{Update rule}
+\label{sec:adag_update_rule}
+
+\section{Experiments}
+\label{sec:adag_experiments}
+
+\subsection{Handwritten digit classification}
+\label{sec:adag_experiment_mnist}
+
+\subsection{Higgs event detection}
+\label{sec:adag_experiment_higgs}
+
+\subsection{Sensitivity to hyperparameters}
+\label{sec:adag_experiment_hyperparameter_sensitivity}
+
+\subsection{Sensitivity to number of parallel workers}
+\label{sec:adag_experiment_parallel_workers}
+
+\section{Future work}
+\label{sec:adag_future_work}

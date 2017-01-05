@@ -10,14 +10,87 @@
 \chapter{Distributed Deep Learning}
 \label{chapter:distributed_deep_learning}
 
-\section{Model Parallelism}
-\label{sec:model_parallelism}
-
-\section{Data Parallelism}
-\label{sec:data_parallelism}
-
-\subsection{Synchronous Data Parallelism}
+\section{Synchronous Data Parallelism}
 \label{sec:synchronous_data_parallelism}
 
-\subsection{Asynchronous Data Parallelism}
+\subsection{Model Averaging}
+\label{sec:model_averaging}
+
+\begin{figure}[H]
+  \centering
+  %% 1
+  \begin{tikzpicture}
+    % Draw the axis of the plots.
+    \draw[->] (0,0) -- (12,0) node[midway, below] {$\theta$};
+    \draw[->] (0,0) -- (0, 2) node[midway, left] {$E(\theta)$};
+    % Draw the hypothesis space, which is sin(x) / 2 + 0.55
+    \draw[samples=400,domain=0:11.8,smooth,variable=\x,black,thick]  plot ({\x},{sin(deg(\x * 2)) / 1.5 + 0.7});
+    % Draw the instances, and their gradient arrows.
+    \draw (1,1.8) node[circle,inner sep=2pt,draw=black!50] {1};
+    \draw[dashed, draw=black!30] (1,1.28) -- (1,1.55);
+    \draw[->] (1.3,1.8) -- (2,1.8) node[midway, above] {\small $\nabla f_1$};
+
+    \draw (3.4,1.8) node[circle,inner sep=2pt,draw=black!50] {2};
+    \draw[dashed, draw=black!30] (3.4,1.1) -- (3.4,1.55);
+    \draw[->] (3.1,1.8) -- (2.2,1.8) node[midway, above] {\small $\nabla f_2$};
+
+    \draw (7,1.8) node[circle,inner sep=2pt,draw=black!50] {3};
+    \draw[dashed, draw=black!30] (7,1.4) -- (7,1.55);
+    \draw[->] (6.7,1.8) -- (6.3,1.8) node[midway, above] {\small $\nabla f_3$};
+
+    \draw (10,1.8) node[circle,inner sep=2pt,draw=black!50] {4};
+    \draw[dashed, draw=black!30] (10,1.35) -- (10,1.55);
+    \draw[->] (9.7,1.8) -- (9.15,1.8) node[midway, above] {\small $\nabla f_4$};
+  \end{tikzpicture}
+  %% 2
+  \begin{tikzpicture}
+    % Draw the axis of the plots.
+    \draw[->] (0,0) -- (12,0) node[midway, below] {$\theta$};
+    \draw[->] (0,0) -- (0, 2) node[midway, left] {$E(\theta)$};
+    % Draw the hypothesis space, which is sin(x) / 2 + 0.55
+    \draw[samples=400,domain=0:11.8,smooth,variable=\x,black,thick]  plot ({\x},{sin(deg(\x * 2)) / 1.5 + 0.7});
+    % Draw the instances, and their gradient arrows.
+    \draw (1.8,1.8) node[circle,inner sep=2pt,draw=black!50] {1};
+    \draw[dashed, draw=black!30] (1.8,0.4) -- (1.8,1.6);
+
+    \draw (2.7,1.8) node[circle,inner sep=2pt,draw=black!50] {2};
+    \draw[dashed, draw=black!30] (2.7,0.3) -- (2.7,1.6);
+
+    \draw (6.6,1.8) node[circle,inner sep=2pt,draw=black!50] {3};
+    \draw[dashed, draw=black!30] (6.6,1.2) -- (6.6,1.6);
+
+    \draw (9.4,1.8) node[circle,inner sep=2pt,draw=black!50] {4};
+    \draw[dashed, draw=black!30] (9.4,0.8) -- (9.4,1.6);
+    % Draw the center variable.
+    \draw (5.125,1.8) node[circle,inner sep=2pt, draw=black!50] {$C$};
+    \draw[dashed, draw=black!30] (5.125,0.3) -- (5.125,1.5);
+  \end{tikzpicture}
+  %% 3
+  \begin{tikzpicture}
+    % Draw the axis of the plots.
+    \draw[->] (0,0) -- (12,0) node[midway, below] {$\theta$};
+    \draw[->] (0,0) -- (0, 2) node[midway, left] {$E(\theta)$};
+    % Draw the hypothesis space, which is sin(x) / 2 + 0.55
+    \draw[samples=400,domain=0:11.8,smooth,variable=\x,black,thick]  plot ({\x},{sin(deg(\x * 2)) / 1.5 + 0.7});
+    % Draw the instances, and their gradient arrows.
+    \draw (5.125,1.8) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$1,2,3,4$};
+    \draw[dashed, draw=black!30] (5.125,0.3) -- (5.125,1.5);
+    \draw[->] (5.95,1.8) -- (7,1.8) node[midway, above] {\small $\nabla f_{1-4}$};
+  \end{tikzpicture}
+  \caption{Caption here}
+\end{figure}
+
+\subsection{Elastic Averaging SGD}
+\label{sec:easgd}
+
+\section{Asynchronous Data Parallelism}
 \label{sec:asynchronous_data_parallelism}
+
+\subsection{Hogwild!}
+\label{sec:hogwild}
+
+\subsection{DOWNPOUR}
+\label{sec:downpour}
+
+\subsection{Asynchronous Elastic Averaging SGD}
+\label{sec:aeasgd}
