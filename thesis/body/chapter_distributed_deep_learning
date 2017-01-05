@@ -83,6 +83,27 @@
 \subsection{Elastic Averaging SGD}
 \label{sec:easgd}
 
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    % Draw the axis of the plots.
+    \draw[->] (1,0) -- (9,0) node[midway, below] {$\theta$};
+    \draw[->] (1,0) -- (1,2) node[midway, left] {$E(\theta)$};
+    % Draw the function.
+    \draw[samples=400,domain=1:8.8,smooth,variable=\x,black,thick]  plot ({\x},{(1 / (\x - 0.45))});
+    % Draw the instances (including the center variable) with the gradient arrows and the elastic difference.
+    \draw (2, 1.8) node[circle, inner sep=2pt, draw=black!50] {$C$};
+    \draw[dashed, draw=black!30] (2,0.65) -- (2,1.5);
+    \draw (5, 1.8) node[circle, inner sep=2pt, draw=black!50] {$w$};
+    \draw[dashed, draw=black!30] (5,0.25) -- (5,1.55);
+    % Draw the gradients and the elastic force.
+    \draw[->] (5.45,1.8) -- (6.1,1.8) node[right, above] {\small $\nabla f_w$};
+    \draw[->] (4.55,1.55) -- (4.2,1.55) node[midway, below] {\small $\eta\rho(\theta_w - \theta_C)$ (small $\rho$)};
+    \draw[->] (4.55,2.05) -- (3.6,2.05) node[midway, above] {\small $\eta\rho(\theta_w - \theta_C)$ (large $\rho$)};
+  \end{tikzpicture}
+  \caption{EASGD Caption here}
+\end{figure}
+
 \section{Asynchronous Data Parallelism}
 \label{sec:asynchronous_data_parallelism}
 
