@@ -13,6 +13,31 @@
 \section{Synchronous Data Parallelism}
 \label{sec:synchronous_data_parallelism}
 
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    % Draw the timeline of the data parallelism.
+    \draw[->] node[left] {$t$} (0,0) -- (10,0);
+    % Draw synchronization.
+    \draw[->] (1,0) -- (1,-1) node[midway, left] {\small Pull $\widetilde{\theta}$};
+    \draw (1,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1, ..., w_n$};
+    % Draw commits.
+    %% 1
+    \draw[->] (4,-1) -- (4,0) node[midway, left] {\small Commit $\nabla f_1$};
+    \draw (4,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1$};
+    %% 2
+    \draw[->] (4.6,-2) -- (4.6,0) node[midway, right] {\small Commit $\nabla f_2$};
+    \draw (4.6,-2.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_2$};
+    % Draw PS processing.
+    \draw (7,0) -- (7,-1.6);
+    \draw (7,-1.86) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {Process variables};
+     % Draw synchronization.
+    \draw[->] (9,0) -- (9,-1) node[midway, left] {\small Pull $\widetilde{\theta}$};
+    \draw (9,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1, ..., w_n$};
+  \end{tikzpicture}
+  \caption{Caption here}
+\end{figure}
+
 \subsection{Model Averaging}
 \label{sec:model_averaging}
 
@@ -106,6 +131,30 @@
 
 \section{Asynchronous Data Parallelism}
 \label{sec:asynchronous_data_parallelism}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    % Draw the timeline of the data parallelism.
+    \draw[->] node[left] {$t$} (0,0) -- (10,0);
+    %% 1
+    \draw[->] (0.9, -1) -- (0.9, 0) node[midway, left] {\small Commit $\nabla f_1$};
+    \draw[->] (1.1, 0) -- (1.1, -1) node[midway, right] {\small Pull $\widetilde{\theta}$};
+    \draw (1,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1$};
+    %% 2
+    \draw[->] (4.5, -1) -- (4.5, 0) node[midway, left] {\small Commit $\nabla f_2$};
+    \draw[->] (4.7, 0) -- (4.7, -1) node[midway, right] {\small Pull $\widetilde{\theta}$};
+    \draw (4.6,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_2$};
+    %% 1
+    \draw[->] (8.5, -1) -- (8.5, 0) node[midway, left] {\small Commit $\nabla f_1$};
+    \draw[->] (8.7, 0) -- (8.7, -1) node[midway, right] {\small Pull $\widetilde{\theta}$};
+    \draw (8.6,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1$};
+    %% Draw staleness.
+    \draw [decorate,decoration={brace,amplitude=10pt}]
+      (1,0.1) -- (8.6,0.1) node [black,midway,yshift=16pt] {\small $\tau$: Staleness of $w_1$};
+  \end{tikzpicture}
+  \caption{Caption here.}
+\end{figure}
 
 \subsection{Hogwild!}
 \label{sec:hogwild}
