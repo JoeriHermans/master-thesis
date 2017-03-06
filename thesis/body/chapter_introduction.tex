@@ -17,7 +17,7 @@ In this chapter we introduce Distributed Deep Learning and the problems surround
 
 Unsupervised feature learning and deep learning has shown that being able to train large models can drastically improve model performance. However, consider the problem of training a deep network with millions, or even billions of parameters. How do we achieve this without waiting for days, or even multiple weeks? Dean et al.~propose a different training paradigm which allows us to train and serve a model on multiple physical machines~\cite{dean2012large}. The authors propose two novel methodologies to accomplish this. Namely, \emph{model parallelism}, introduced in Section~\ref{sec:intro_model_parallelism}, and \emph{data parallelism}, introduced in Section~\ref{sec:intro_data_parallelism}.\\
 
-In this thesis we study \emph{data parallelism}, since this methodology mainly focuses on the development of distributed optimization algorithms. Whereas, \emph{model parallelism} is mainly an engineering effort because it still follows the traditional optimization scheme, i.e., sequential gradient updates in the case the applied optimizer utilizes a gradient based approach.
+In this thesis we study \emph{data parallelism}, since this methodology mainly focuses on the development of distributed optimization algorithms. Whereas, \emph{model parallelism} is mainly an engineering effort because it still follows the traditional optimization scheme, i.e., sequential gradient updates in the case the applied numerical optimizer utilizes a gradient based approach.
 
 \subsection{Model Parallelism}
 \label{sec:intro_model_parallelism}
