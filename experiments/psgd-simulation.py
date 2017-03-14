@@ -36,7 +36,7 @@ import threading
 ## BEGIN Globals. ##############################################################
 
 # Total number of workers.
-g_num_workers = 10
+g_num_workers = 40
 
 # Parameter server port.
 g_port_ps = 5000
@@ -80,7 +80,7 @@ def catch_signals():
 
 def allocate_settings():
     settings = {}
-    settings['communication_window'] = 5
+    settings['communication_window'] = 15
     settings['learning_rate'] = 0.0001
 
     return settings
@@ -223,14 +223,13 @@ class worker(threading.Thread):
             delta -= learning_rate * g
             # Apply gradient update.
             if update % communication_window == 0:
-                cv = self.pull()
                 #delta /= communication_window
                 #t = np.abs(cv - self.center_variable)
                 #t = 1 / (np.exp(t))
                 #delta = np.multiply(t, delta)
                 self.commit(delta)
                 delta.fill(0.0)
-                cv += delta
+                cv = self.pull()
                 #cv = self.pull()
                 self.center_variable = cv
                 self.model = cv

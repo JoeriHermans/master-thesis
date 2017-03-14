@@ -1,0 +1,16 @@
+% Chapter on Asynchronous Distributed Adaptive Gradient
+%
+% Developed for my Master Thesis at Maastricht University.
+% Based on Eugenio Senes's template at the University of Torino.
+%
+% By Joeri Hermans (joeri@joerihermans.com)
+%
+% Released under an MIT license. Share, modify and enjoy, but quote the author!
+
+\chapter{Accumulated Gradient Normalization}
+\label{chapter:accumulated_gradient_normalization}
+
+\begin{equation}
+  \label{eq:accumulated_gradient_normalization}
+  \Delta\theta = -\frac{\sum_{i = 0}^\lambda \eta(t) \frac{1}{m}\sum_{j = 0}^m \nabla f(\theta_i;x_{ij};y_{ij})}{\lambda}
+\end{equation}

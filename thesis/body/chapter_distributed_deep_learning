@@ -47,31 +47,31 @@
   \begin{tikzpicture}
     % Draw the axis of the plots.
     \draw[->] (0,0) -- (12,0) node[midway, below] {$\theta$};
-    \draw[->] (0,0) -- (0, 2) node[midway, left] {$E(\theta)$};
+    \draw[->] (0,0) -- (0, 2) node[midway, left] {$J(\theta)$};
     % Draw the hypothesis space, which is sin(x) / 2 + 0.55
     \draw[samples=400,domain=0:11.8,smooth,variable=\x,black,thick]  plot ({\x},{sin(deg(\x * 2)) / 1.5 + 0.7});
     % Draw the instances, and their gradient arrows.
     \draw (1,1.8) node[circle,inner sep=2pt,draw=black!50] {1};
     \draw[dashed, draw=black!30] (1,1.28) -- (1,1.55);
-    \draw[->] (1.3,1.8) -- (2,1.8) node[midway, above] {\small $\nabla f_1$};
+    \draw[->] (1.3,1.8) -- (2,1.8) node[midway, above] {\small $\Delta\theta_1$};
 
     \draw (3.4,1.8) node[circle,inner sep=2pt,draw=black!50] {2};
     \draw[dashed, draw=black!30] (3.4,1.1) -- (3.4,1.55);
-    \draw[->] (3.1,1.8) -- (2.2,1.8) node[midway, above] {\small $\nabla f_2$};
+    \draw[->] (3.1,1.8) -- (2.2,1.8) node[midway, above] {\small $\Delta\theta_2$};
 
     \draw (7,1.8) node[circle,inner sep=2pt,draw=black!50] {3};
     \draw[dashed, draw=black!30] (7,1.4) -- (7,1.55);
-    \draw[->] (6.7,1.8) -- (6.3,1.8) node[midway, above] {\small $\nabla f_3$};
+    \draw[->] (6.7,1.8) -- (6.3,1.8) node[midway, above] {\small $\Delta\theta_3$};
 
     \draw (10,1.8) node[circle,inner sep=2pt,draw=black!50] {4};
     \draw[dashed, draw=black!30] (10,1.35) -- (10,1.55);
-    \draw[->] (9.7,1.8) -- (9.15,1.8) node[midway, above] {\small $\nabla f_4$};
+    \draw[->] (9.7,1.8) -- (9.15,1.8) node[midway, above] {\small $\Delta\theta_4$};
   \end{tikzpicture}
   %% 2
   \begin{tikzpicture}
     % Draw the axis of the plots.
     \draw[->] (0,0) -- (12,0) node[midway, below] {$\theta$};
-    \draw[->] (0,0) -- (0, 2) node[midway, left] {$E(\theta)$};
+    \draw[->] (0,0) -- (0, 2) node[midway, left] {$J(\theta)$};
     % Draw the hypothesis space, which is sin(x) / 2 + 0.55
     \draw[samples=400,domain=0:11.8,smooth,variable=\x,black,thick]  plot ({\x},{sin(deg(\x * 2)) / 1.5 + 0.7});
     % Draw the instances, and their gradient arrows.
@@ -94,13 +94,13 @@
   \begin{tikzpicture}
     % Draw the axis of the plots.
     \draw[->] (0,0) -- (12,0) node[midway, below] {$\theta$};
-    \draw[->] (0,0) -- (0, 2) node[midway, left] {$E(\theta)$};
+    \draw[->] (0,0) -- (0, 2) node[midway, left] {$J(\theta)$};
     % Draw the hypothesis space, which is sin(x) / 2 + 0.55
     \draw[samples=400,domain=0:11.8,smooth,variable=\x,black,thick]  plot ({\x},{sin(deg(\x * 2)) / 1.5 + 0.7});
     % Draw the instances, and their gradient arrows.
     \draw (5.125,1.8) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$1,2,3,4$};
     \draw[dashed, draw=black!30] (5.125,0.3) -- (5.125,1.5);
-    \draw[->] (5.95,1.8) -- (7,1.8) node[midway, above] {\small $\nabla f_{1-4}$};
+    \draw[->] (5.95,1.8) -- (7,1.8) node[midway, above] {\small $\Delta\theta_{1-4}$};
   \end{tikzpicture}
   \caption{Caption here}
 \end{figure}
@@ -113,7 +113,7 @@
   \begin{tikzpicture}
     % Draw the axis of the plots.
     \draw[->] (1,0) -- (9,0) node[midway, below] {$\theta$};
-    \draw[->] (1,0) -- (1,2) node[midway, left] {$E(\theta)$};
+    \draw[->] (1,0) -- (1,2) node[midway, left] {$J(\theta)$};
     % Draw the function.
     \draw[samples=400,domain=1:8.8,smooth,variable=\x,black,thick]  plot ({\x},{(1 / (\x - 0.45))});
     % Draw the instances (including the center variable) with the gradient arrows and the elastic difference.
@@ -122,7 +122,7 @@
     \draw (5, 1.8) node[circle, inner sep=2pt, draw=black!50] {$w$};
     \draw[dashed, draw=black!30] (5,0.25) -- (5,1.55);
     % Draw the gradients and the elastic force.
-    \draw[->] (5.45,1.8) -- (6.1,1.8) node[right, above] {\small $\nabla f_w$};
+    \draw[->] (5.45,1.8) -- (6.1,1.8) node[right, above] {\small $-\nabla f_w$};
     \draw[->] (4.55,1.55) -- (4.2,1.55) node[midway, below] {\small $-\eta\rho(\theta_w - \theta_C)$ (small $\rho$)};
     \draw[->] (4.55,2.05) -- (3.6,2.05) node[midway, above] {\small $-\eta\rho(\theta_w - \theta_C)$ (large $\rho$)};
   \end{tikzpicture}
