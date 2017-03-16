@@ -10,83 +10,24 @@
 \chapter{Introduction}
 \label{chapter:introduction}
 
-In this chapter we introduce Distributed Deep Learning and the problems surrounding it. A more detailed description of the subject of study is given in Chapter~\ref{chapter:distributed_deep_learning}. Furthermore, we make the reader more comfortable with the notation and abbreviations used throughout this thesis. Finally, we formally define the problem statement in Section~\ref{sec:problem_statement}, and give an outline of this thesis in Section~\ref{sec:thesis_outline}.
+In this chapter we introduce the main concept, and problems surrounding the parallization of gradient descent. We familliarize the reader with the topic and some notation by providing some context why someone would like to apply said technique. Furthermore, in Section~\ref{sec:problem_statement}, we summarize the problem statement and provide several research questions which will guide the research in this work. Finally, we conclude this chapter in Section~\ref{sec:thesis_outline} with a brief outline of the thesis.
 
-\section[Distributed Deep Learning]{Distributed Deep Learning, an introduction}
-\label{sec:intro_distributed_deep_learning}
+\section{Motivation}
+\label{sec:motivation}
 
-Unsupervised feature learning and deep learning has shown that being able to train large models can drastically improve model performance. However, consider the problem of training a deep network with millions, or even billions of parameters. How do we achieve this without waiting for days, or even multiple weeks? Dean et al.~propose a different training paradigm which allows us to train and serve a model on multiple physical machines~\cite{dean2012large}. The authors propose two novel methodologies to accomplish this. Namely, \emph{model parallelism}, introduced in Section~\ref{sec:intro_model_parallelism}, and \emph{data parallelism}, introduced in Section~\ref{sec:intro_data_parallelism}.\\
+In recent years it has been shown that being able to train large and deep neural networks result in state-of-the-art performance~\cite{wu2016google, dean2012large}, especially regarding unsupervised feature learning and image recognition. However, consider the required time, and cost of the infrastructure that would be required in order to train such a large model in a reasonable amount of time. Furthermore, it is not only the training time and cost of the infrastructure which need to be taken into consideration, but also the volume of the data. The amount of information that will be gathered will be an increasing important factor in the next few years. Not only with respect to big technology companies and government organizations, but also scientific surveys with limited budgets. These scientific surveys will generate more experimental data than ever~\cite{hllhcdesignreport, ivezic2008lsst}, and will have to process and analyze that data. To solve the problem of increased computational workloads and budget freezes, the High Energy Physics (HEP) community is exploring and researching machine learning approaches to fit physics problems~\cite{bian2016recent, de2017learning, louppe2016learning} with the intention to improve detection quality, or reduce computational constraints.\\
 
-In this thesis we study \emph{data parallelism}, since this methodology mainly focuses on the development of distributed optimization algorithms. Whereas, \emph{model parallelism} is mainly an engineering effort because it still follows the traditional optimization scheme, i.e., sequential gradient updates in the case the applied numerical optimizer utilizes a gradient based approach.
+However, the sheer size of these datasets severly impacts the training time of the models. In order to resolve this issue, one could sample some representative subset of the data in order to reduce the training time. The disadvantage of this approach is that is possible that some ``diverse`` instances, i.e., data points, do not appear in the final training set. This is especially a problem in Deep Learning, where models usually benifit from having access to a lot of training data due to the high dimensionality of the parametrization~\cite{dean2012large}. In order to resolve this issue, Dean et al.~\cite{dean2012large} introduce two new paradigms to decrease the training time in the prescense of a large dataset and a high dimensionality of the parametrization. The two paradigms, \emph{Model Parallelism}, briefly discussed in Section~\ref{sec:intro_model_parallelism}, and \emph{Data Parallelism}, discussed in Section~\ref{sec:intro_data_parallelism}, are inherently different ways of decreasing the training time of a model.\\
 
-\subsection{Model Parallelism}
+The first paradigm, \emph{Model Parallelism}, is the intuitively most straightforward one since it deals with the parallelization of the computations within a \emph{single} model, i.e., how to parallelize the computations of a single model over multiple machines, or multiple processes. The second paradigm, which will be the main focus of this thesis, is \emph{Data Parallelism}. As stated above, the main concept of Data Parallelism will be discussed in detail in Section~\ref{sec:intro_data_parallelism}. However, for completion, think of Data Parallelism as a technique to \emph{parallelize gradient descent}. This is done by allocating $n$ processes over possibly $n$ different machines, and splitting the training set into $n$ \emph{partitions}, or \emph{shards}. For further convenience, we will call such a process a \emph{worker}. In the next step, we assign a single distinct partition to a worker. Meaning, the worker will not be able to fetch training data from other partitions since those have been assigned to different workers. The goal of these workers is to work together, and optimize the parameters of a central model. A lot of different distributed optimization schemes have been suggested in recent years~\cite{zhang2015deep, dean2012large, hadjis2016omnivore, ??}. Most of the recent contributions try to push the limits of (asynchronous) Data Parallelism by simply \emph{annealing} the gradients with respect to some hyperparameter without giving a sound theoretical argument why the annealing should happen in the first place.\\
+
+Recently, new theoretical work supported by experimental evidence was introduced by Mitliagkas et al.~\cite{implicitmomentum}. We will discuss this work in detail, and provide some supporting experimental evidence in Section~\ref{sec:implicit_momentum}.
+
+\section{Model Parallelism}
 \label{sec:intro_model_parallelism}
 
-In \emph{model parallelism}, a single model is distributed over multiple machines~\cite{dean2012large}. The performance benefits of distributing a deep network across multiple machines mainly depends on the structure of the model. Models with a large number of parameters typically benefit from access to more CPU cores and memory, up to the point where communication costs, i.e., propagation of weight updates and synchronization mechanisms, dominate~\cite{dean2012large}.\\
-
-Let us start with a simple example in order to illustrate this concept more clearly. Imagine having a perceptron, as depicted in Figure~\ref{fig:introduction_model_parallelism_perceptron}. In order to parallelize this efficiently, we can view a neural network as a dependency graph, where the goal is to minimize the number of synchronization mechanisms, assuming we have unlimited resources. Furthermore, a synchronization mechanism is only required when a node has more than 1 \emph{variable} dependency. A variable dependency is a dependency which can change in time. For example, a bias would be a \emph{static} dependency, because the value of a bias remains constant over time. In the case for the perceptron shown in Figure~\ref{fig:introduction_model_parallelism_perceptron}, the parallelization is quite straightforward. The only synchronization mechanism which should be implemented resides in output neuron since $y \triangleq \sigma(\sum_i w_ix_i$) where $\sigma$ is the activation function of the output neuron.
-
-\begin{figure}[H]
-  \centering
-  \begin{tikzpicture}
-
-    % Draw inputs.
-    \node (i_0) at (-3, 0.7) {$x_0$};
-    \node (i_1) at (-1.5, 0.7) {$x_1$};
-    \node (i_2) at (0, 0.7) {$x_2$};
-    \node (i_3) at (1.5, 0.7) {$x_3$};
-    \node (i_4) at (3, 0.7) {$x_4$};
-
-
-    % Draw the input neurons.
-    \node[circle, minimum size=0.2cm, thin, draw=black] (1) at (-3,0) {};
-    \node[circle, minimum size=0.2cm, thin, draw=black] (2) at (-1.5,0) {};
-    \node[circle, minimum size=0.2cm, thin, draw=black] (3) at (0,0) {};
-    \node[circle, minimum size=0.2cm, thin, draw=black] (4) at (1.5,0) {};
-    \node[circle, minimum size=0.2cm, thin, draw=black] (5) at (3,0) {};
-
-    % Draw the output neuron.
-    \node[circle, minimum size=0.2cm, thin, draw=black] (6) at (0, -1.5) {};
-
-    % Draw output.
-    \node (y) at (0, -2.5) {$y$};
-
-    % Draw the lines.
-    % X -> Input.
-    \draw[->] (i_0) -- (1);
-    \draw[->] (i_1) -- (2);
-    \draw[->] (i_2) -- (3);
-    \draw[->] (i_3) -- (4);
-    \draw[->] (i_4) -- (5);
-    % Input -> Output.
-    \draw[->] (1) -- (6);
-    \draw[->] (2) -- (6);
-    \draw[->] (3) -- (6);
-    \draw[->] (4) -- (6);
-    \draw[->] (5) -- (6);
-    % Output.
-    \draw[->] (6) -- (y);
-
-    % Draw the nodes.
-    \draw[rounded corners=3pt] (-3.4,0.4) rectangle ++(0.8,-0.8);
-    \draw[rounded corners=3pt] (-1.9,0.4) rectangle ++(0.8,-0.8);
-    \draw[rounded corners=3pt] (-0.4,0.4) rectangle ++(0.8,-0.8);
-    \draw[rounded corners=3pt] (1.1,0.4) rectangle ++(0.8,-0.8);
-    \draw[rounded corners=3pt] (2.6,0.4) rectangle ++(0.8,-0.8);
-    \draw[rounded corners=3pt] (-0.4,-1.05) rectangle ++(0.8,-0.8);
-  \end{tikzpicture}
-  \caption{A perceptron partitioned using the \emph{model parallelism} paradigm. In this approach every input node is responsible for accepting the input $x_i$ from some source, and multiplying the input with the associated weight $w_i$. After the multiplication, the result is sent to the node which is responsible for computing $y$. Of course, this node requires a synchronization mechanism to ensure that the result is consistent. The synchronization mechanism does this by waiting for the results $y$ depends on.}
-  \label{fig:introduction_model_parallelism_perceptron}
-\end{figure}
-
-\subsection{Data Parallelism}
+\section{Data Parallelism}
 \label{sec:intro_data_parallelism}
-
-In this thesis, we focus our efforts on data parallelism. Data parallelism is an inherently different methodology of optimizing parameters. The general idea is to reduce the training time by having $n$ different workers optimizing a model by processing $n$ different shards (partitions) of the dataset in parallel~\cite{dean2012large}. In this setting we distribute $n$ model replicas over $n$ processing nodes, i.e., every node (or process) holds one model replica. Then, the workers train their local replica using the assigned data shard. However, it is possible to coordinate the workers in such a way that, together, they will optimize a single objective. There are several approaches to achieve this, and these will be discussed in greater detail in Chapter~\ref{chapter:distributed_deep_learning}.\\
-
-Nevertheless, a popular approach to optimize this objective, is to employ a centralized \emph{parameter server}~\cite{dean2012large, zhang2015deep, recht2011hogwild}. A parameter server is responsible for the aggregation of model updates, and parameter requests coming from different workers. The distributed learning process starts by partitioning a dataset into $n$ \emph{shards}. Every individual shard will be assigned to a particular worker. Next, a worker will sample mini-batches from its shard in order to train the local model replica. After every mini-batch (or multiple mini-batches), the workers will communicate a variable with the parameter server. This variable is in most implementations the gradient $\nabla f_i(x)$. Finally, the parameter server will integrate this variable by applying a specific \textsc{update} procedure which knows how to handle this variable. This process repeats itself untill all workers have sampled all mini-batches from their shard. The above high level description is summarized in Figure~\ref{fig:introduction_data_parallelism_schematic}.\\
-
-
 
 \begin{figure}[H]
   \centering

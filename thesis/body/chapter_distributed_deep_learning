@@ -156,6 +156,9 @@
   \caption{Caption here.}
 \end{figure}
 
+\subsection{Asychrony Induced Momentum}
+\label{sec:implicit_momentum}
+
 \subsection{Hogwild!}
 \label{sec:hogwild}
 
