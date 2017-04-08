@@ -15,15 +15,15 @@ In this chapter we introduce the main concept, and problems surrounding the para
 \section{Motivation}
 \label{sec:motivation}
 
-In recent years it has been shown that being able to train large and deep neural networks result in state-of-the-art performance~\cite{wu2016google, dean2012large}, especially regarding unsupervised feature learning and image recognition. However, consider the required time, and cost of the infrastructure that would be required in order to train such a large model in a reasonable amount of time. Furthermore, it is not only the training time and cost of the infrastructure which need to be taken into consideration, but also the volume of the data. The amount of information that will be gathered will be an increasing important factor in the next few years. Not only with respect to big technology companies and government organizations, but also scientific surveys with limited budgets. These scientific surveys will generate more experimental data than ever~\cite{hllhcdesignreport, ivezic2008lsst}, and will have to process and analyze that data. To solve the problem of increased computational workloads and budget freezes, the High Energy Physics (HEP) community is exploring and researching machine learning approaches to fit physics problems~\cite{bian2016recent, de2017learning, louppe2016learning} with the intention to improve detection quality, or reduce computational constraints.\\
+In recent years it has been shown that being able to train large and deep neural networks result in state-of-the-art performance~\cite{wu2016google, dean2012large}, especially regarding unsupervised feature learning and image recognition. However, consider the required time, and cost of the infrastructure that would be required in order to train a large model in a reasonable amount of time. Furthermore, it is not only the training time and cost of the infrastructure which need to be taken into consideration, but also the volume of the data. The amount of information that will be gathered will be an increasing important factor in the next few years. Not only with respect to big technology companies and government organizations, but also scientific surveys with limited budgets. These scientific surveys will generate more experimental data than ever~\cite{hllhcdesignreport, ivezic2008lsst}, and will have to process and analyze that data. To solve the problem of increased computational workloads and budget freezes, the High Energy Physics (HEP) community is exploring and researching machine learning approaches to fit physics problems~\cite{bian2016recent, de2017learning, louppe2016learning} with the intention to improve detection quality, or reduce computational constraints.\\
 
-However, the sheer size of these datasets severly impacts the training time of the models. In order to resolve this issue, one could sample some representative subset of the data to reduce the training time. The disadvantage of this approach is that some ``diverse`` instances, i.e., data points, might not appear in the final training set. This is especially a problem in Deep Learning, where models usually benifit from having access to a lot of training data due to the high dimensionality of the parametrization~\cite{dean2012large}. To resolve this issue, Dean et al.~\cite{dean2012large} introduce two new paradigms to decrease the training time in the presence of a large dataset and a high dimensionality of the parametrization. The two paradigms, \emph{Model Parallelism}, briefly discussed in Section~\ref{sec:intro_model_parallelism}, and \emph{Data Parallelism}, discussed in Section~\ref{sec:intro_data_parallelism}, are inherently different ways of decreasing the training time of a model.\\
+However, the sheer size of these datasets severly impacts the training time of the models. In order to resolve this issue, one could sample some representative subset of the data to reduce the training time. The disadvantage of this approach is that some instances, i.e., data points, might not appear in the final training set. This is especially a problem in Deep Learning, where models usually benifit from having access to a lot of training data due to the high dimensionality of the parametrization~\cite{dean2012large}. To resolve this issue, Dean et al.~\cite{dean2012large} introduce two new paradigms to decrease the training time of a large model. The two paradigms, \emph{Model Parallelism}, briefly discussed in Section~\ref{sec:intro_model_parallelism}, and \emph{Data Parallelism}, discussed in Section~\ref{sec:intro_data_parallelism}, are inherently different ways of decreasing the training time of a model.\\
 
-The first paradigm, \emph{Model Parallelism}, is intuitively the most straightforward paradigm since it deals with the parallelization of the computations within a \emph{single} model, i.e., how to parallelize the computations of a single model over multiple machines, or multiple processes. The second paradigm, which will be the main focus of this thesis, is \emph{Data Parallelism}. As stated above, the main concept of Data Parallelism will be discussed in detail in Section~\ref{sec:intro_data_parallelism}. However, for completion, think of Data Parallelism as a technique to \emph{parallelize gradient descent}. This is done by allocating $n$ processes over possibly $n$ different machines, and splitting the training set into $n$ \emph{partitions}, or \emph{data shards}. For further convenience, we will call such a process a \emph{worker}. In the next step, we assign a single distinct partition to a worker. Meaning, the worker will not be able to fetch training data from other partitions since those have been assigned to different workers. The goal of these workers is to work together, and optimize the parameters of a central model.\\
+The first paradigm, \emph{Model Parallelism}, is intuitively the most straightforward paradigm since it deals with the parallelization of the computations within a \emph{single} model, i.e., how to parallelize the computations of a single model over multiple machines, or multiple processes. The second paradigm, which will be the main focus of this thesis, is \emph{Data Parallelism}. As stated above, the main concept of Data Parallelism will be discussed in detail in Section~\ref{sec:intro_data_parallelism}. However, for completion, think of Data Parallelism as a technique to \emph{parallelize gradient descent}. This is done by allocating $n$ processes over possibly $n$ different machines, and splitting the training set into $n$ \emph{partitions}, or \emph{data shards}. For further convenience, we will call such a process a \emph{worker}. In the next step, we assign a single distinct partition to a worker. Meaning, the worker will not be able to fetch training data from other partitions since those have been assigned to different workers. However, in certain data parallel settings, it is benificial to actually consume data from other partitions, once a worker has finished its partition. Finally, the goal of these workers is to work together, and optimize the parameters of a central model.\\
 
-A lot of different distributed optimization schemes have been suggested in recent years~\cite{zhang2015deep, dean2012large, hadjis2016omnivore, ??}. Most of the recent contributions try to push the limits of asynchronous Data Parallelism, discussed in Section~\ref{sec:asynchronous_data_parallelism}, by simply \emph{annealing} the gradients with respect to some hyperparameter without giving a sound theoretical argument why the annealing should happen in the first place. This suggests that there is an intrinsic limit to asynchronous Data Parallelism, as suggested by~\cite{implicitmomentum}. Why not simply reduce the number of parallel workers if we reduce the impact of the gradient updates by means of annealing anyway? The approach of reducing the number of parallel workers in such a situation has been suggested by~\cite{hadjis2016omnivore}, where they perform a \emph{grid-search} of the training hyperparamers (this includes the number of workers) in order to provide the optimal hyperparameters within a training epoch. However, the disadvantage of this technique is that after every epoch, or a specific number of iterations, a grid-search of the hyperparameters has to be performed in order to obtain the optimal configuration of the hyperparameters to ensure convergence.\\
+A lot of different distributed optimization schemes have been suggested in recent years~\cite{zhang2015deep, dean2012large, hadjis2016omnivore}. Most of the recent contributions try to push the limits of asynchronous Data Parallelism, discussed in Section~\ref{sec:asynchronous_data_parallelism}, by simply \emph{annealing} the gradients with respect to some hyperparameter to improve the convergence when the number of workers increases. This suggests that there is an intrinsic limit to asynchronous Data Parallelism, as suggested by~\cite{implicitmomentum}. As a result, why don't we simply reduce the number of parallel workers if we reduce the impact of the gradient updates by means of annealing anyway? The approach of reducing the number of parallel workers in such a situation has been suggested by~\cite{hadjis2016omnivore}, where they perform a \emph{grid-search} of the training hyperparamers (this includes the number of workers) in order to provide the optimal hyperparameters within a training epoch. However, the disadvantage of this technique is that after every epoch, or a specific number of iterations, a grid-search of the hyperparameters has to be performed in order to obtain the optimal configuration of the hyperparameters to ensure convergence.\\
 
-This brings us to the main motivation behind this work. We intent to obtain a better theoretical understanding of \emph{asynchronous} Data Parallism by building upon previous work, and combine it with novel insights to construct a new distributed optimization scheme without introducing new hyperparameters, or relying on grid-searches to optimize the configuration of existing hyperparameters.
+This brings us to the main motivation behind this work. We intent to obtain a better understanding of \emph{asynchronous} Data Parallism by building upon previous work, and combine it with novel insights to construct a new distributed optimization scheme without introducing new hyperparameters, or relying on grid-searches to optimize the configuration of existing hyperparameters.
 
 \section{Model Parallelism}
 \label{sec:intro_model_parallelism}
@@ -33,7 +33,7 @@ TODO
 \section{Data Parallelism}
 \label{sec:intro_data_parallelism}
 
-As stated above, Data Parallelism is a technique to \emph{parallelize gradient descent}, and thereby reducing the overal training time of a model. In essence, Data Parallelism achieves this by distributing the workload over multiple workers\footnote{As stated in Section~\ref{sec:motivation}, a worker is a process on a single machine. However, it is possible that multiple workers share the same machine. Nevertheless, one could construct the distribution mechanism (even manually) in such a way every worker will be placed on a different machine.}, and by coordination the workers in such a way that they optimize the parametrization of a central model, which we denote by $\tilde{\theta}_t$. The coordination mechanism of the workers can be implemented in many different ways. However, in order to formalize the main concept of Data Parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $W = \{w_1, \ldots, w_n\}$. Where every workers holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a \emph{Parameter Server} (PS), where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $D$ will be split into $n$ roughly equally sized partitions $P = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{D}\right\vert}$. Finally, the data partition $p_i$ will be assigned to the corresponding worker $w_i$.
+As stated above, Data Parallelism is a technique to \emph{parallelize gradient descent}, and thereby reducing the overal training time of a model. In essence, Data Parallelism achieves this by distributing the workload over multiple workers\footnote{As stated in Section~\ref{sec:motivation}, a worker is a process on a single machine. However, it is possible that multiple workers share the same machine. Nevertheless, one could construct the distribution mechanism (even manually) in such a way every worker will be placed on a different machine.}, and by coordinating the workers in such a way that they optimize the parametrization of a central model, which we denote by $\tilde{\theta}_t$. The coordination mechanism of the workers can be implemented in many different ways. In order to formalize the main concept of Data Parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $\mathcal{W} = \{w_1, \ldots, w_n\}$. Where every worker $w_i \in \mathcal{W}$ holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a \emph{Parameter Server} (PS), where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $\mathcal{D}$ will be split into roughly $n$ equally sized partitions $\mathcal{P} = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{\mathcal{D}}\right\vert}$, and where $p_i$ will be assigned to the corresponding worker $w_i$.\\
 
 \begin{figure}[H]
   \centering
@@ -133,7 +133,7 @@ As stated above, Data Parallelism is a technique to \emph{parallelize gradient d
     \draw[gray] (#1 - 0.25,#2) -- (#1 + 0.125, #2 - 0.25);
     \draw[gray] (#1 - 0.25,#2) -- (#1 - 0.125, #2 - 0.25);
     \draw[gray] (#1 - 0.5,#2) -- (#1 + 0.125, #2 - 0.25);
-    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
+v    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
     % Define input layer.
     \draw[fill=white] (#1 - 0.375,#2 + 0.25) circle (1pt);
     \draw[fill=white] (#1 - 0.125,#2 + 0.25) circle (1pt);
@@ -170,7 +170,7 @@ As stated above, Data Parallelism is a technique to \emph{parallelize gradient d
     % Draw the parameter server.
     \draw[rounded corners=3pt] (-3, 5) rectangle ++(6,-0.8);
     \node (pslabel) at (-1, 4.6) {Parameter Server};
-    \node (psequation) at (-0.2, 5.3) {$\tilde{\theta}_{t+1} = \textsc{update}(\tilde{\theta}_t, \eta_t, \nabla f_i(\textbf{x}))$};
+    \node (psequation) at (-0.2, 5.3) {$\tilde{\theta}_{t+1} = \textsc{Commit}(v)$};
     % Draw the lines.
     \neuralnetclean at (1.8, 4.6);
     \draw[->] (-3.1, 2.95) -- (-2.6, 4.1);
@@ -183,12 +183,55 @@ As stated above, Data Parallelism is a technique to \emph{parallelize gradient d
     \draw[<-] (2.9, 2.95) -- (2.4, 4.1);
     % Draw the labels.
     \node (commit) at (-2.15, 3.4) {$\tilde{\theta}_{t+1}$};
-    \node (pull) at (-3.6, 3.4) {$\nabla f_i(\textbf{x})$};
+    \node (pull) at (-3.3, 3.4) {$v$};
     % More labels.
   \end{tikzpicture}
-  \caption{Schematic representation of a data parallel approach. In this methodology we spawn $n$ workers (not necessarily on different machines), and assign a data shard (partition) of the dataset to every worker. Using this data shard, a worker $i$ will iterate through all mini-batches to produce a gradient, $\nabla f_i(x)$, for every mini-batch $x$. Next, $\nabla f_i(x)$ is send to the parameter server, which will incorperate the gradient using an~\textsc{update} mechanism.}
+  \caption{Schematic representation of a data parallel approach. In this methodology we spawn $n$ workers (not necessarily on different machines), and assign a data shard (partition) of the dataset to every worker. Using this data shard, a worker $i$ will iterate through all mini-batches to produce a gradient, $\nabla \mathcal{L}_i(x)$, for every mini-batch $x$. Next, $\nabla \mathcal{L}_i(x)$ is send to the parameter server, which will incorperate the gradient using an~\textsc{update} mechanism.}
   \label{fig:introduction_data_parallelism_schematic}
 \end{figure}
+
+In general, all data parallel approaches share a similar training procedure, i.e., every worker computes some variable which is communicated with the parameter server to update the central model. In most cases, this variable represents some change $\Delta\theta$ which needs to be applied to the central variable $\tilde{\theta}_t$. However, some approaches such as~\cite{zhang2015deep}, actually require that the complete worker parametrization $\theta^k_t$ is sent to the parameter server. To simplify this specific optimizer detail in this chapter, we denote the variable that is sent to the parameter server by $v$.
+
+% Define the general data parallel worker algorithm.
+\begin{algorithm}[H]
+  \caption{Describes the general optimization procedure of a worker in a data parallel setting. The worker will be identified with a certain index $k$, the other parameter $p_k \in \mathcal{P}$, is the data partition which has been assigned to worker $k$.}
+  \label{algo:data_parallelism_worker}
+  \begin{algorithmic}[1]
+    \Procedure{Worker}{$k$, $p_k$}
+    \State $\theta^k_0 \gets \Call{Pull}{ }$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $\textbf{m} \gets \Call{FetchNextMiniBatch}{p_k}$
+    \State $\theta^k_{t + 1} \gets \theta^k_t - \eta_t \cdot \nabla \mathcal{L}(\theta^k_t~;~\textbf{m})$ \Comment{Optimization step, could be \cite{kingma2014adam}, or other optimizer.}
+    \State $v \gets \Call{PrepareCommit}{ }$
+    \State $\Call{Commit}{v}$
+    \State $\theta^k_t \gets \Call{Pull}{ }$
+    \State $t \gets t + 1$
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+% Define the general commit update mechanism.
+\begin{algorithm}[H]
+  \caption{Intialization and variable handling procedures of a parameter server. Before the distributed optimization starts, the \textsc{IntializeParameterServer} procedure is called to initialize the local parameters, given the parametrization $\theta$ of the specified model. We would like to note that $t$ maintained by the parameter server, is different from the $t$ variable specified in Algorithm~\ref{algo:data_parallelism_worker}.}
+  \label{algo:data_parallelism_parameter_server}
+  \begin{algorithmic}[1]
+    \Procedure{IntializeParameterServer}{$\theta$}
+    \State $\tilde{\theta}_0 \gets \theta$
+    \State $t \gets 0$
+    \EndProcedure
+    \State
+    \Procedure{Commit}{$v$}
+    \State $\tilde{\theta}_{t + 1} \gets \Call{ApplyCommit}{v}$
+    \State $t \gets t + 1$
+    \EndProcedure
+    \State
+    \Procedure{Pull}{ }
+    \State \Return $\tilde{\theta}_t$
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
 
 \section{Problem Statement}
 \label{sec:problem_statement}
