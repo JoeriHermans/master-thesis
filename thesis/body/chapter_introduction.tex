@@ -33,7 +33,69 @@ TODO
 \section{Data Parallelism}
 \label{sec:intro_data_parallelism}
 
-As stated above, Data Parallelism is a technique to \emph{parallelize gradient descent}, and thereby reducing the overal training time of a model. In essence, Data Parallelism achieves this by distributing the workload over multiple workers\footnote{As stated in Section~\ref{sec:motivation}, a worker is a process on a single machine. However, it is possible that multiple workers share the same machine. Nevertheless, one could construct the distribution mechanism (even manually) in such a way every worker will be placed on a different machine.}, and by coordinating the workers in such a way that they optimize the parametrization of a central model, which we denote by $\tilde{\theta}_t$. The coordination mechanism of the workers can be implemented in many different ways. In order to formalize the main concept of Data Parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $\mathcal{W} = \{w_1, \ldots, w_n\}$. Where every worker $w_i \in \mathcal{W}$ holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a \emph{Parameter Server} (PS), where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $\mathcal{D}$ will be split into roughly $n$ equally sized partitions $\mathcal{P} = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{\mathcal{D}}\right\vert}$, and where $p_i$ will be assigned to the corresponding worker $w_i$.\\
+Data Parallelism is an inherently different methodology of optimizing parameters. As stated above, it is a technique to \emph{parallelize gradient descent}, and thereby reducing the overal training time of a model. In essence, Data Parallelism achieves this by having $n$ workers optimizing a central model, and at the same time, processing $n$ different shards (partitions) of the dataset in parallel over multiple workers\footnote{As stated in Section~\ref{sec:motivation}, a worker is a process on a single machine. However, it is possible that multiple workers share the same machine. Nevertheless, one could construct the distribution mechanism (even manually) in such a way every worker will be placed on a different machine.}. The workers are coordinated in such a way that they optimize the parametrization of a central model, which we denote by $\tilde{\theta}_t$. The coordination mechanism of the workers can be implemented in many different ways. Nevertheless, a popular approach to coordinate workers in their task to optimize the central objective, is to employ a centralized \emph{Parameter Server} (PS). The sole responsibility of the parameter server is to aggregate model updates coming from the workers (\emph{worker commits}), and to handle parameter requests (\emph{worker pulls}). In general, there are several approaches towards data parallelism. However, they can all be categorized into two main groups, i.e., \emph{Synchronous Data Parallelism}, and \emph{Asynchronous Data Parallelism}.\\
+
+\begin{figure}[H]
+  \centering
+  % Define database shape.
+  \def\database at (#1,#2){
+    \draw (#1,#2) ellipse (0.5 and 0.15);
+    \draw (#1 - 0.5, #2) -- (#1 - 0.5, #2 - 1);
+    \draw (#1 + 0.5, #2) -- (#1 + 0.5, #2 - 1);
+    \draw (#1 - 0.5, #2 - 1/3) arc (180:360:0.5 and 0.15);
+    \draw (#1 - 0.5, #2 - 2/3) arc (180:360:0.5 and 0.15);
+    \draw (#1 - 0.5, #2 - 1) arc (180:360:0.5 and 0.15);
+  }
+  \def\minibatch at (#1,#2){
+    \draw[rounded corners=3pt, draw=black!20, fill=black!10] (#1 - 1.08, #2) rectangle (#1 + 1.08, #2 - 0.8);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25, anchor=north] (#1 - 0.25, #2 - 0.4 + 0.25) rectangle (#1 + 0.25, #2 - 0.4 - 0.25);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25, anchor=north] (#1 - 0.25 - 0.6, #2 - 0.4 + 0.25) rectangle (#1 + 0.25 - 0.6, #2 - 0.4 - 0.25);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25, anchor=north] (#1 - 0.25 + 0.6, #2 - 0.4 + 0.25) rectangle (#1 + 0.25 + 0.6, #2 - 0.4 - 0.25);
+    \draw[->] (#1, #2 - 0.9) -- (#1, #2 - 1.5);
+  }
+  \begin{tikzpicture}
+    % Draw the dataset.
+    \database at (-5, 0.5);
+    \draw[->] (-4.4, 0) -- (-2.35, 0);
+    % Draw the minibatch container.
+    \draw[rounded corners=3pt, draw=black!20, fill=black!10] (-2.25, 0.4) rectangle (2.25, -0.4);
+    % Place the mini-batch label.
+    \node at (1.25, 0.65) {mini-batch};
+    % Draw the instances inside the minibatch.
+    % Center
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25] (-0.25, 0.25) rectangle (0.25, -0.25);
+    % Left
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25] (-0.25 - 0.6, 0.25) rectangle (0.25 - 0.6, -0.25);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25, anchor=north] (-0.25 - 1.2, 0.25) rectangle (0.25 - 1.2, -0.25);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25] (-0.25 - 1.8, 0.25) rectangle (0.25 - 1.8, -0.25);
+    % Right
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25] (-0.25 + 0.6, 0.25) rectangle (0.25 + 0.6, -0.25);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25] (-0.25 + 1.2, 0.25) rectangle (0.25 + 1.2, -0.25);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25] (-0.25 + 1.8, 0.25) rectangle (0.25 + 1.8, -0.25);
+    % Draw the training instance description.
+    \node at (-5, 1.5) (description) {Single training instance};
+    \draw (description) edge[out=0, in=90, ->] (-1.2, 0.3);
+    % Draw lines to parallel computation.
+    \draw[->] (-1.25, -0.5) -- (-2, -1);
+    \draw[->] (1.25, -0.5) -- (2, -1);
+    % Draw the minibatches.
+    \minibatch at (-2, -1.1);
+    \node at (-2, -1.1 - 1.8) {$\sum_i \nabla \mathcal{L}(\theta_t~;~\textbf{x}_i~;~\textbf{y}_j)$};
+    \minibatch at (2, -1.1);
+    \node at (2, -1.1 - 1.8) {$\sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)$};
+    % Add averaging.
+    \draw (2, -3.3) edge[out=-110, in=60, ->] (0.1, -4);
+    \draw (-2, -3.3) edge[out=-80, in=120, ->] (-0.1, -4);
+    \node at (0, -4.4) {$g = \frac{\sum_i \nabla \mathcal{L}(\theta_t~;~\textbf{x}_i~;~\textbf{y}_j) + \sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)}{m}$};
+    % Add result.
+    \draw[->] (0, -4.9) -- (0, -5.2);
+    \node at (0, -5.5) {$\theta_{t + 1} = \theta_t - \eta_t \cdot g$};
+  \end{tikzpicture}
+  \caption{Caption here}
+  \label{fig:minibatch_data_parallelism}
+\end{figure}
+
+In order to formalize the main concept of Data Parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $\mathcal{W} = \{w_1, \ldots, w_n\}$. Where every worker $w_i \in \mathcal{W}$ holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a parameter server, where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $\mathcal{D}$ will be split into roughly $n$ equally sized partitions $\mathcal{P} = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{\mathcal{D}}\right\vert}$, and where $p_i$ will be assigned to the corresponding worker $w_i$.\\
 
 \begin{figure}[H]
   \centering
