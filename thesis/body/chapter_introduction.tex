@@ -86,10 +86,7 @@ Data Parallelism is an inherently different methodology of optimizing parameters
     % Add averaging.
     \draw (2, -3.3) edge[out=-110, in=60, ->] (0.1, -4);
     \draw (-2, -3.3) edge[out=-80, in=120, ->] (-0.1, -4);
-    \node at (0, -4.4) {$g = \frac{\sum_i \nabla \mathcal{L}(\theta_t~;~\textbf{x}_i~;~\textbf{y}_j) + \sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)}{m}$};
-    % Add result.
-    \draw[->] (0, -4.9) -- (0, -5.2);
-    \node at (0, -5.5) {$\theta_{t + 1} = \theta_t - \eta_t \cdot g$};
+    \node at (0, -4.4) {$\theta_{t+1} = \theta_t - \eta_t \cdot \frac{\sum_i \nabla \mathcal{L}(\theta_t~;~\textbf{x}_i~;~\textbf{y}_j) + \sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)}{m}$};
   \end{tikzpicture}
   \caption{Caption here}
   \label{fig:minibatch_data_parallelism}
