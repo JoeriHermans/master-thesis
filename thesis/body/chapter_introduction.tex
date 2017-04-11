@@ -88,7 +88,7 @@ Let us start with a simple example in order to illustrate this concept more clea
 \section{Data Parallelism}
 \label{sec:intro_data_parallelism}
 
-data parallelism is an inherently different methodology of optimizing parameters. As stated above, it is a technique to \emph{parallelize gradient descent}, and thereby reducing the overal training time of a model. In essence, data parallelism achieves this by having $n$ workers optimizing a central model, and at the same time, processing $n$ different shards (partitions) of the dataset in parallel over multiple workers\footnote{As stated in Section~\ref{sec:motivation}, a worker is a process on a single machine. However, it is possible that multiple workers share the same machine. Nevertheless, one could construct the distribution mechanism (even manually) in such a way every worker will be placed on a different machine.}. The workers are coordinated in such a way that they optimize the parametrization of a central model, which we denote by $\tilde{\theta}_t$. The coordination mechanism of the workers can be implemented in many different ways. Nevertheless, a popular approach to coordinate workers in their task to optimize the central objective, is to employ a centralized \emph{Parameter Server} (PS). The sole responsibility of the parameter server is to aggregate model updates coming from the workers (\emph{worker commits}), and to handle parameter requests (\emph{worker pulls}). In general, there are several approaches towards data parallelism, where some of which do not require a parameter server. However, all approaches can be categorized into two main groups, i.e., \emph{Synchronous Data Parallelism}, and \emph{Asynchronous Data Parallelism}.\\
+Data parallelism is an inherently different methodology of optimizing parameters. As stated above, it is a technique to \emph{parallelize gradient descent}, and thereby reducing the overal training time of a model. In essence, data parallelism achieves this by having $n$ workers optimizing a central model, and at the same time, processing $n$ different shards (partitions) of the dataset in parallel over multiple workers\footnote{As stated in Section~\ref{sec:motivation}, a worker is a process on a single machine. However, it is possible that multiple workers share the same machine. Nevertheless, one could construct the distribution mechanism (even manually) in such a way every worker will be placed on a different machine.}. The workers are coordinated in such a way that they optimize the parametrization of a central model, which we denote by $\tilde{\theta}_t$. The coordination mechanism of the workers can be implemented in many different ways. Nevertheless, a popular approach to coordinate workers in their task to optimize the central objective, is to employ a centralized \emph{Parameter Server} (PS). The sole responsibility of the parameter server is to aggregate model updates coming from the workers (\emph{worker commits}), and to handle parameter requests (\emph{worker pulls}). In general, there are several approaches towards data parallelism, where some of which do not require a parameter server. However, all approaches can be categorized into two main groups, i.e., \emph{Synchronous Data Parallelism}, and \emph{Asynchronous Data Parallelism}.\\
 
 \emph{Synchronous Data Parallelism} can be usually identified by the presence of one or multiple locking mechanisms. As in Software Engineering, the purpose of these locking mechanisms is to preserve the consistancy of the state of a model. As an example, let us consider mini-batch parallelism in Figure~\ref{fig:minibatch_data_parallelism} for a moment. Despite it is trivial to implement locally, one could view mini-batch parallelism as an instance of synchronous data parallelism. First and foremost, mini-batch parallelism is a data parallel technique because we split the mini-batch into several partitions where every partition is consumed by its own worker to produce the sum of the gradients, or \emph{accumulated gradient}, as a result. Finally, mini-batch parallelism is synchronous in nature because in order to compute $\theta_{t+1}$, we need to obtain the averaged gradients $\frac{\sum_i \nabla \mathcal{L}(\theta_t~;~\textbf{x}_i~;~\textbf{y}_i)}{m}$, which is actually the sum of the accumulated gradients of all workers, divided by the number of training instances $m$ in the original mini-batch. As a result, the synchronization barrier is present right before the averaging of the accumulated gradients, since these are the intermediary results we have to wait for before applying a gradient update.
 
@@ -143,15 +143,177 @@ data parallelism is an inherently different methodology of optimizing parameters
     % Add averaging.
     \draw (2, -3.3) edge[out=-110, in=60, ->] (1.3, -4);
     \draw (-2, -3.3) edge[out=-80, in=120, ->] (-1.7, -4);
-    \node at (-1.7, -4.4) {$\theta_{t+1} = \theta_t - \eta_t \cdot \frac{\sum_i \nabla \mathcal{L}(\theta_t~;~\textbf{x}_i~;~\textbf{y}_j) + \sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)}{m}$};
+    \node at (-1.7, -4.4) {$\theta_{t+1} = \theta_t - \eta_t \odot \frac{\sum_i \nabla \mathcal{L}(\theta_t~;~\textbf{x}_i~;~\textbf{y}_j) + \sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)}{m}$};
   \end{tikzpicture}
   \caption{Mini-batch parallelism could be viewed as an instance of synchronous data parallelism without a centralized parameter server. Given a mini-batch size of $m$, we split the mini-batch into several partitions, where a specific worker is responsible for the computation of its own partition. The synchronous nature of this approach lies within the aggregation of the computed gradients, i.e., the results of all workers need to be aggregated, and afterwards averaged in order to integrate the current gradient into the model.}
   \label{fig:minibatch_data_parallelism}
 \end{figure}
 
-However, what happens when the computing resources on your local machine are constrained? That is, due to the limited amount of available CPU cores (or even GPU's) your parallization of the mini-batch computation doesn't scale very well on your local machine.\\
+However, consider what happens when the computational resources on your machine are constrained, or even fully utilized? That is, due to the limited amount of available CPU cores (or even GPU's) your parallization of the mini-batch computation doesn't scale very well on your machine. The most straightforward solution would be to purchase more performant hardware, but this is not always possible, not only from a financial perspective, but also from a physical one. An alternative approach would be to solve the problem like a distributed system. In order to make this particular approach work, we need a parameter server to coordinate the workers. Since this still is a synchronous approach, the locking mechanism in this particular case is the parameter server itself, since the parameter server will not be able to send the next parameterization $\theta_{t+1}$ of the model to the workers because the parameter server can only compute the $\theta_{t+1}$ once it received, and processed all accumulated gradients as shown in Figure~\ref{fig:distributed_mini_batch_parallelism}. Yet, if one or multiple machines encouter some unmodeled load, for example, because an other user is running a CPU intensive program, then the synchronization mechanism might actually be a serious bottleneck, because during that time the reserved resources on other machines are not being utilized. This effect becomes even more prominent when the infrastructure is \emph{non-homogeneous}, i.e., multiple machines with different hardware in the same computing cluster cause the workers to be out-of-sync (on top of the unmodeled system behaviour), which in turn results in more waits enforced by the parameter server as it acts as a locking mechanism in synchronous data parallelism.
 
-In \emph{Asynchronous Data Parallelism} on the other hand, there is no global locking mechanism. This implies that whenever a worker wants to submit a new result, it is able to modify the central model.\\
+\begin{figure}[H]
+  \centering
+  % Define database shape.
+  \def\database at (#1,#2){
+    \draw (#1,#2) ellipse (0.5 and 0.15);
+    \draw (#1 - 0.5, #2) -- (#1 - 0.5, #2 - 1);
+    \draw (#1 + 0.5, #2) -- (#1 + 0.5, #2 - 1);
+    \draw (#1 - 0.5, #2 - 1/3) arc (180:360:0.5 and 0.15);
+    \draw (#1 - 0.5, #2 - 2/3) arc (180:360:0.5 and 0.15);
+    \draw (#1 - 0.5, #2 - 1) arc (180:360:0.5 and 0.15);
+  }
+  % Define datashard shape.
+  \def\datashard at (#1,#2){
+    \draw (#1,#2) ellipse (0.5 and 0.15);
+    \draw (#1 - 0.5, #2) -- (#1 - 0.5, #2 - 1/3);
+    \draw (#1 + 0.5, #2) -- (#1 + 0.5, #2 - 1/3);
+    \draw (#1 - 0.5, #2 - 1/3) arc (180:360:0.5 and 0.15);
+  }
+  \def\minibatch at (#1,#2){
+    \draw[rounded corners=3pt, draw=black!20, fill=black!10] (#1 - 0.7, #2) rectangle (#1 + 0.7, #2 - 0.8);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25, anchor=north] (#1 - 0.55, #2 + 0.25 - 0.4) rectangle (#1 - 0.05, #2 - 0.25 - 0.4);
+    \draw[rounded corners=2pt, draw=blue!35, fill=blue!25, anchor=north] (#1 + 0.05, #2 + 0.25 - 0.4) rectangle (#1 + 0.55, #2 - 0.25 - 0.4);
+  }
+  % Define the neural network shape.
+  \def\neuralnet at (#1,#2){
+    % Draw node bounding box.
+    \draw[rounded corners=3pt] (#1 - 0.7,#2 + 0.5) rectangle ++(1.4,-0.95);
+    % Draw fully connected lines.
+    \draw[gray] (#1 + 0.25,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
+    % Define input layer.
+    \draw[fill=white] (#1 - 0.375,#2 + 0.25) circle (1pt);
+    \draw[fill=white] (#1 - 0.125,#2 + 0.25) circle (1pt);
+    \draw[fill=white] (#1 + 0.125,#2 + 0.25) circle (1pt);
+    \draw[fill=white] (#1 + 0.375,#2 + 0.25) circle (1pt);
+    % Define hidden layer.
+    \draw[fill=white] (#1 - 0.5,#2) circle (1pt);
+    \draw[fill=white] (#1 - 0.25,#2) circle (1pt);
+    \draw[fill=white] (#1,#2) circle (1pt);
+    \draw[fill=white] (#1 + 0.25,#2) circle (1pt);
+    \draw[fill=white] (#1 + 0.5,#2) circle (1pt);
+    % Define output layer.
+    \draw[fill=white] (#1 - 0.125,#2 - 0.25) circle (1pt);
+    \draw[fill=white] (#1 + 0.125,#2 - 0.25) circle (1pt);
+  }
+  \def\neuralnetclean at (#1,#2){
+    \draw[gray] (#1 + 0.25,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.375, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 + 0.125, #2 + 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 + 0.375, #2 + 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1 + 0.25,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1 + 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 + 0.125, #2 - 0.25);
+    \draw[gray] (#1 - 0.25,#2) -- (#1 - 0.125, #2 - 0.25);
+    \draw[gray] (#1 - 0.5,#2) -- (#1 + 0.125, #2 - 0.25);
+v    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
+    % Define input layer.
+    \draw[fill=white] (#1 - 0.375,#2 + 0.25) circle (1pt);
+    \draw[fill=white] (#1 - 0.125,#2 + 0.25) circle (1pt);
+    \draw[fill=white] (#1 + 0.125,#2 + 0.25) circle (1pt);
+    \draw[fill=white] (#1 + 0.375,#2 + 0.25) circle (1pt);
+    % Define hidden layer.
+    \draw[fill=white] (#1 - 0.5,#2) circle (1pt);
+    \draw[fill=white] (#1 - 0.25,#2) circle (1pt);
+    \draw[fill=white] (#1,#2) circle (1pt);
+    \draw[fill=white] (#1 + 0.25,#2) circle (1pt);
+    \draw[fill=white] (#1 + 0.5,#2) circle (1pt);
+    % Define output layer.
+    \draw[fill=white] (#1 - 0.125,#2 - 0.25) circle (1pt);
+    \draw[fill=white] (#1 + 0.125,#2 - 0.25) circle (1pt);
+  }
+  \begin{tikzpicture}
+    \database at (0,-1);
+    \draw[->] (-0.6,-1.5) -- (-3, -0.1);
+    \draw[->] (-0.6,-1.1) -- (-1, -0.1);
+    \draw[->] (0.6,-1.1) -- (1, -0.1);
+    \draw[->] (0.6,-1.5) -- (3, -0.1);
+    \datashard at (-3,0.6);
+    \datashard at (-1,0.6);
+    \datashard at (1,0.6);
+    \datashard at (3,0.6);
+    \minibatch at (-3, 1.7);
+    \minibatch at (-1, 1.7);
+    \minibatch at (1, 1.7);
+    \minibatch at (3, 1.7);
+    \neuralnet at (3,2.35);
+    \neuralnet at (1,2.35);
+    \neuralnet at (-1,2.35);
+    \neuralnet at (-3,2.35);
+    % Draw the parameter server.
+    \draw[rounded corners=3pt] (-3, 5) rectangle ++(6,-0.8);
+    \node (pslabel) at (-1, 4.6) {Parameter Server};
+    \node (psequation) at (0.1, 5.6) {$\tilde{\theta}_{t+1} = \tilde{\theta}_t - \eta_t \odot \frac{\sum_i^n \Big( \sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j) \Big)_i}{m}$};
+    \node (description) at (-3, 6.5) {Result of worker $i$};
+    \draw (description) edge[out=0, in=110, ->] (0.3, 6.1);
+    % Draw the lines.
+    \neuralnetclean at (1.8, 4.6);
+    \draw[->] (-3.1, 2.95) -- (-2.6, 4.1);
+    \draw[<-] (-2.9, 2.95) -- (-2.4, 4.1);
+    \draw[->] (-1.1, 2.95) -- (-1.1, 4.1);
+    \draw[<-] (-0.9, 2.95) -- (-0.9, 4.1);
+    \draw[->] (1.1, 2.95) -- (1.1, 4.1);
+    \draw[<-] (0.9, 2.95) -- (0.9, 4.1);
+    \draw[->] (3.1, 2.95) -- (2.6, 4.1);
+    \draw[<-] (2.9, 2.95) -- (2.4, 4.1);
+    % Draw the labels.
+    \node (commit) at (-2.15, 3.4) {$\tilde{\theta}_{t+1}$};
+    \node (pull) at (-4.7, 3.4) {$\sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)$};
+    % More labels.
+  \end{tikzpicture}
+  \caption{Distributed mini-batch data parallelism with $n$ parallel workers, with a total mini-batch size of $m$. At the start, the data is split into $n$ partitions, and all workers get a copy of the central model with parameterization $\tilde{\theta}_0$. When the training starts, every worker $i$ computes the accumulated gradient $\sum_j \nabla \mathcal{L}(\theta_t~;~\textbf{x}_j~;~\textbf{y}_j)$ based on its part of the mini-batch, which is then \emph{commited} (send) to the parameter server. After the parameter server receives all accumulated gradients, it averages them, and then applies the batched gradient to the model in order to produce $\tilde{\theta}_{t+1}$. After the new parametrization is available, the workers will be able to \emph{pull} (download) $\tilde{\theta}_{t+1}$, and repeat the procedure described above.}
+  \label{fig:distributed_mini_batch_parallelism}
+\end{figure}
+
+This of course begs the question, \emph{can we eliminate the need for a locking mechanism}? There are some significant initial counter-arguments against removing the synchronization barrier. TODO\\
 
 In order to formalize the main concept of data parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $\mathcal{W} = \{w_1, \ldots, w_n\}$. Where every worker $w_i \in \mathcal{W}$ holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a parameter server, where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $\mathcal{D}$ will be split into roughly $n$ equally sized partitions $\mathcal{P} = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{\mathcal{D}}\right\vert}$, and where $p_i$ will be assigned to the corresponding worker $w_i$.\\
 
@@ -322,7 +484,7 @@ In general, all data parallel approaches share a similar training procedure, i.e
     \State $t \gets 0$
     \While{$\textbf{not}$ converged}
     \State $\textbf{m} \gets \Call{FetchNextMiniBatch}{p_k}$
-    \State $\theta^k_{t + 1} \gets \theta^k_t - \eta_t \cdot \nabla \mathcal{L}(\theta^k_t~;~\textbf{m})$ \Comment{Optimization step, could be \cite{kingma2014adam}, or other optimizer.}
+    \State $\theta^k_{t + 1} \gets \theta^k_t - \eta_t \odot \nabla \mathcal{L}(\theta^k_t~;~\textbf{m})$ \Comment{Optimization step, could be \cite{kingma2014adam}, or other optimizer.}
     \State $v \gets \Call{PrepareCommit}{ }$
     \State $\Call{Commit}{v}$
     \State $\theta^k_t \gets \Call{Pull}{ }$
