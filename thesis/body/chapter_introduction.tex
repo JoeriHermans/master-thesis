@@ -313,7 +313,46 @@ v    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
   \label{fig:distributed_mini_batch_parallelism}
 \end{figure}
 
-This of course begs the question, \emph{can we eliminate the need for a locking mechanism}? There are some significant initial counter-arguments against removing the synchronization barrier. TODO\\
+This of course begs the question, \emph{can we eliminate the need for a locking mechanism to prevent unnecessary waits of the workers}? There are some significant initial counter-arguments against removing the synchronization barrier. The first \\
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    % Draw the timeline.
+    \node at (-5.5, 0) {$t$};
+    \draw[->] (-5, 0) -- (5, 0);
+
+    % Draw the first pull of the workers.
+    \draw[->] (-4, 0) -- (-4, -1);
+    \draw[->] (-3.1, 0) -- (-3.1, -1);
+    \draw[rounded corners=2pt] (-4.4, -1) rectangle (-3.6, -1.5) node[pos=.55] {$w_1$};
+    \draw[rounded corners=2pt] (-3.5, -1) rectangle (-2.7, -1.5) node[pos=.55] {$w_2$};
+    % Draw initial pull decoration.
+    \draw [decorate,decoration={brace,amplitude=5pt}]
+    (-4.1, 0.1) -- (-3, 0.1) node [black,midway,yshift=13pt] {\small $\tilde{\theta}_t$};
+
+    % Draw first commit and pull.
+    \draw[->] (-1, 0) --(-1, -1);
+    \draw[<-] (-1.2, 0) -- (-1.2, -1);
+    \node at (-1.9, -0.6) {\small $\nabla \mathcal{L}_1(\tilde{\theta}_t)$};
+    \draw[rounded corners=2pt] (-1.1 - 0.4, -1) rectangle (-1.1 + 0.4, -1.5) node[pos=.55] {$w_1$};
+    \node at (-1.1, 0.5) {\small $\tilde{\theta}_{t+1} = \tilde{\theta}_t - \eta_t \odot \nabla \mathcal{L}_1(\tilde{\theta}_t)$};
+
+    % Draw second commit and pull.
+    \draw[<-] (3, 0) --(3, -1);
+    \draw[->] (3.2, 0) -- (3.2, -1);
+    \node at (2.3, -0.6) {\small $\nabla \mathcal{L}_2(\tilde{\theta}_t)$};
+    \draw[rounded corners=2pt] (3.1 - 0.4, -1) rectangle (3.1 + 0.4, -1.5) node[pos=.55] {$w_2$};
+    \node at (3.1, 0.5) {\small $\tilde{\theta}_{t+2} = \tilde{\theta}_{t+1} - \eta_t \odot \nabla \mathcal{L}_2(\tilde{\theta}_t)$};
+
+    % Write description.
+    \node at (-2, 2) {Updating $\tilde{\theta}_{t+1}$ with gradient $\nabla \mathcal{L}_2(\tilde{\theta}_t)$ based on $\tilde{\theta}_t$};
+    \draw (-2.4, 1.7) edge[out=-30, in=110, ->] (2.4, 0.8);
+    \draw (2, 1.95) edge[out=0, in=110, ->] (4.15, 0.8);
+  \end{tikzpicture}
+  \caption{In Asynchronous Data Parallelism workers compute and commit gradients to the parameter server asynchronously. This has as a side-effect that some workers are computing, and thus committing, gradients based on old values. These gradients are called \emph{stale gradients} in literature. In this particular example there are 2 workers $w_1$, and $w_2$. At the start optimization process, the pull the most recent parameterization from the parameter server $\tilde{\theta}_t$. Now all workers start computing the gradients asynchronously based on the pulled parametrization. However, since the parameter server incorperates gradients into the center variable asynchronously as a simple queuing (FIFO) model, other workers will update the center variable with gradients based on an older value, as shown in the figure above.}
+  \label{fig:intro_asyn_data_parallelism}
+\end{figure}
 
 In order to formalize the main concept of data parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $\mathcal{W} = \{w_1, \ldots, w_n\}$. Where every worker $w_i \in \mathcal{W}$ holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a parameter server, where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $\mathcal{D}$ will be split into roughly $n$ equally sized partitions $\mathcal{P} = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{\mathcal{D}}\right\vert}$, and where $p_i$ will be assigned to the corresponding worker $w_i$.\\
 
