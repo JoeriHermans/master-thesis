@@ -21,6 +21,7 @@
 \usepackage{algorithmicx}
 \usepackage{algpseudocode}
 \usepackage{algorithm}
+\usepackage{ntheorem}
 \usepackage{amsfonts}                 % Blackboard math symbols
 \usepackage{amsmath}                  % AMS Math
 \usepackage{amssymb}                  % AMS Symbols
@@ -40,6 +41,10 @@
 % Define page structure using Geometry.
 % For printing, set right to 35mm
 \geometry{a4paper, portrait, left=35mm, right=20mm, top=35mm, bottom=30mm}
+
+% Setup the theorem envrionment.
+\theoremseparator{:}
+\newtheorem{hyp}{Hypothesis}
 
 % Define the core properties of your thesis.
 \title{On Scalable Deep Learning and Parallelizing Gradient Descent}  % Title of the thesis
