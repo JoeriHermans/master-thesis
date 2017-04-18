@@ -380,10 +380,9 @@ One could of course argue, why not use a smaller number of workers since we are 
 
 \newpage
 
-\subsection{Formalization}
-\label{sec:data_parallelism_formalization}
+Now some general approaches and important issues regarding data parallelism have been addressed, and the reader has gained some intuition on the subject, we can formalize data parallelism and use the notation in the following chapters. In order to formalize data parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $\mathcal{W} = \{w_1, \ldots, w_n\}$. Where every worker $w_i \in \mathcal{W}$ holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a parameter server, where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $\mathcal{D}$ will be split into roughly $n$ equally sized partitions $\mathcal{P} = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{\mathcal{D}}\right\vert}$, and where $p_i$ will be assigned to the corresponding worker $w_i$.\\
 
-Now all general approaches and important issues regarding data parallelism have been addressed, and the reader has gained some intuition on the subject, we can formalize data parallelism and use the notation in the following chapters. In order to formalize data parallelism, let us assume we have a dataset $D$, which contains our training data, and that we are able to distribute dataset $D$ over $n$ different workers $\mathcal{W} = \{w_1, \ldots, w_n\}$. Where every worker $w_i \in \mathcal{W}$ holds a copy of the central model, thus, a copy of the parameterization of the central model $\tilde{\theta}_0$. Furthermore, we denote the parametrization of a particular worker $k$ at time $t$ by $\theta_t^k$. Of course, if a worker wants to contribute to the optimization of the central model, the worker needs to be able to relay update information and retrieve the most recent parameterization of the central model. This is done by instantiating a parameter server, where workers will be able to \emph{commit} their updates, and \emph{pull} the most recent parameterization of the central model. The parameterization of the central model is called the \emph{central variable}, which we denote by $\tilde{\theta}_t$. In the final preperation step, before the actual training starts, $\mathcal{D}$ will be split into roughly $n$ equally sized partitions $\mathcal{P} = \{p_1, \ldots, p_n\}$, where $\left\vert{p_i}\right\vert \approx \frac{1}{\left\vert{\mathcal{D}}\right\vert}$, and where $p_i$ will be assigned to the corresponding worker $w_i$.\\
+In general, all data parallel approaches share a similar training procedure, i.e., every worker computes some variable which is communicated with the parameter server to update the central model. In most cases, this variable represents some change $\Delta\theta$ which needs to be applied to the central variable $\tilde{\theta}_t$. However, some approaches such as~\cite{zhang2015deep}, actually require that the complete worker parametrization $\theta^k_t$ is sent to the parameter server. To abstract this specific optimizer detail, we denote the variable that is sent to the parameter server by $v$. This procedure is described in Algorithm~\ref{algo:data_parallelism_worker} and~\ref{algo:data_parallelism_parameter_server}.
 
 \begin{figure}[H]
   \centering
@@ -536,15 +535,31 @@ v    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
     \node (pull) at (-3.3, 3.4) {$v$};
     % More labels.
   \end{tikzpicture}
-  \caption{Schematic representation of a data parallel approach. In this methodology we spawn $n$ workers (not necessarily on different machines), and assign a data shard (partition) of the dataset to every worker. Using this data shard, a worker $i$ will iterate through all mini-batches to produce a gradient, $\nabla_\theta \mathcal{L}_i(x)$, for every mini-batch $x$. Next, $\nabla_\theta \mathcal{L}_i(x)$ is send to the parameter server, which will incorperate the gradient using an~\textsc{update} mechanism.}
+  \caption{Schematic representation of a data parallel approach. In this methodology we spawn $n$ workers (not necessarily on different machines), and assign a data shard (partition) of the dataset to every worker. Using this data shard, a worker $i$ will iterate through all mini-batches to produce a gradient, $\nabla_\theta \mathcal{L}_i(x)$, for every mini-batch $\textbf{m}$. Next, a variable $v$ is constructed on the worker which is send to the parameter server. The parameter server will incorperate the variable using a~\textsc{Commit} mechanism to produce the next central parametrization $\tilde{\theta}_{t+1}$.}
   \label{fig:introduction_data_parallelism_schematic}
 \end{figure}
 
-In general, all data parallel approaches share a similar training procedure, i.e., every worker computes some variable which is communicated with the parameter server to update the central model. In most cases, this variable represents some change $\Delta\theta$ which needs to be applied to the central variable $\tilde{\theta}_t$. However, some approaches such as~\cite{zhang2015deep}, actually require that the complete worker parametrization $\theta^k_t$ is sent to the parameter server. To simplify this specific optimizer detail in this chapter, we denote the variable that is sent to the parameter server by $v$.
+Nevertheless, the most common and one of the earliest asynchronous optimization algorithm is \textsc{downpour}~\cite{dean2012large}. We will use \textsc{downpour} as a baseline performance indicator for all our experiments with other distributed optimization algorithms. In essence, workers are continuously committing gradients to the parameter server using Equation~\ref{eq:downpour_worker}. After a gradient has been committed to the parameter server, the worker will \emph{pull} the most recent parameterization from the parameter server in order to be consistent with the updates of other workers, as in Algorithm~\ref{algo:data_parallelism_worker} and~\ref{algo:data_parallelism_parameter_server}.
+
+\begin{equation}
+  \label{eq:downpour_worker}
+  \Delta \theta^k = - \eta_t \odot \nabla_\theta \mathcal{L}(\tilde{\theta}_{t-\tau}~;~\textbf{x}~;~\textbf{y})
+\end{equation}
+
+\newpage
+
+Once the parameter server received the update $\Delta\theta^k$ from worker $k$, the parameter server will simply add (since the worker already negated the gradient) the update to the current central variable in order to produce $\tilde{\theta}_{t+1}$.
+
+\begin{equation}
+  \label{eq:downpour_parameter_server}
+  \tilde{\theta}_{t+1} = \tilde{\theta}_t + \Delta \theta^k
+\end{equation}
+
+\vspace*{\fill}
 
 % Define the general data parallel worker algorithm.
-\begin{algorithm}[H]
-  \caption{Describes the general optimization procedure of a worker in a data parallel setting. The worker will be identified with a certain index $k$, the other parameter $p_k \in \mathcal{P}$, is the data partition which has been assigned to worker $k$.}
+\begin{algorithm}
+  \caption{Describes the general asynchronous optimization procedure of a worker in a data parallel setting. The worker will be identified with a certain index $k$, the other parameter $p_k \in \mathcal{P}$, is the data partition which has been assigned to worker $k$.}
   \label{algo:data_parallelism_worker}
   \begin{algorithmic}[1]
     \Procedure{Worker}{$k$, $p_k$}
@@ -562,8 +577,10 @@ In general, all data parallel approaches share a similar training procedure, i.e
   \end{algorithmic}
 \end{algorithm}
 
+\vspace*{1cm}
+
 % Define the general commit update mechanism.
-\begin{algorithm}[H]
+\begin{algorithm}
   \caption{Intialization and variable handling procedures of a parameter server. Before the distributed optimization starts, the \textsc{IntializeParameterServer} procedure is called to initialize the local parameters, given the parametrization $\theta$ of the specified model. We would like to note that $t$ maintained by the parameter server, is different from the $t$ variable specified in Algorithm~\ref{algo:data_parallelism_worker}.}
   \label{algo:data_parallelism_parameter_server}
   \begin{algorithmic}[1]
@@ -582,6 +599,10 @@ In general, all data parallel approaches share a similar training procedure, i.e
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
+
+\vspace*{\fill}
+
+\newpage
 
 \section{Problem Statement}
 \label{sec:problem_statement}
