@@ -659,4 +659,26 @@ As stated above, being able to train a model on a vast amount of data generally 
 \section{Thesis Outline}
 \label{sec:thesis_outline}
 
-TODO
+In this chapter we introduced the main concept, and problems surrounding the parallization of gradient
+descent. We familliarized the reader with the topic and some notation by providing some context why
+someone would like to apply said technique.\\
+
+Chapter~\ref{chapter:distributed_deep_learning} will discuss several distributed optimization methods, i.e., their strenghts, and pitfalls. Furthermore, we give some context in order to understand why some of these methods have been proposed, and how they perform in these situations.\\
+
+\emph{Accumulated Gradient Normalization}, our first contribution, appears in Chapter~\ref{chapter:accumulated_gradient_normalization}. We propose said technique to allow for local exploration in the error space to provide better updates to the parameter server. In general, this technique reduces the communication overhead, thus taking into account communication constraints which other techniques try to solve in a different way. Furthermore, in contrast to previous approaches, our approach is not sensitive to hyperparametrization.\\
+
+In Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients} we introduce our optimizer \textsc{adag}, or \emph{Asynchronous Distributed Adaptive Gradients}, which is an asynchronous data parallel approach which uses the contributions from Chapter~\ref{chapter:accumulated_gradient_normalization}, and implements Hypothesis~\ref{hyp:local_optimization}. We examine how \emph{Accumulated Gradient Normalization} is assisting the optimization process to check for potential synergies.\\
+
+When all theory has been presented, we validate our results and hypotheses by performing some experiments on traditional datasets such as MNIST, and CIFAR to have a baseline comparison to validate against different methods. But also on CERN-specific problems, such as track reconstruction as mentioned in Section~\ref{sec:problem_statement}.\\
+
+Finally, we conclude the thesis in Chapter~\ref{chapter:conclusion} by summarizing the contributions that have been made, and the empirical results from our experiments.\\
+
+\vspace{2cm}
+
+\noindent We use the following research questions to guide our study of parallelizing gradient descent:
+
+\begin{enumerate}
+  \item When do workers contribute positively to the central variable during training?
+  \item Why does asynchronous EASGD diverge when a small communication frequency is used, and converges with a large communication frequency?
+  \item Why does \emph{Accumulated Gradient Normalization} converge faster, compared to equivalently sized mini-batches?
+\end{enumerate}
