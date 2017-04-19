@@ -354,7 +354,7 @@ This of course begs the question, \emph{can we eliminate the need for a locking 
   \label{fig:intro_asyn_data_parallelism}
 \end{figure}
 
-However, experiments have shown that removing the synchronization barrier actually allows models to converge~\cite{dean2012large, zhang2015deep, hadjis2016omnivore}, even when most workers update the central variable using a gradient based on an outdated parameterization of the central variable. An other issue, which only has been formalized recently, is \emph{Implicit Momentum} or \emph{Asynchrony Induced Momentum}~\cite{implicitmomentum}. The main reasoning behind implicit momentum, which will be discussed in detail in Section~\ref{sec:implicit_momentum}, is based on a very simple but powerful idea. The idea states that \emph{memory arizes from asynchrony}. Intuitively, this implies that ``memory'' of previous gradients is preserved due to \emph{stale gradient} updates. This can be observed directly from Figure~\ref{fig:intro_asyn_data_parallelism}, where the update of $w_2$ is actually updating the central variable with a gradient identical to $\nabla_\theta \mathcal{L}_1(\tilde{\theta}_t)$ if we assume that both workers computed the gradient based on the same input data. This is a clear indication that asynchronous data parallelism is \emph{implicitly} (because of the asynchronous nature of the approach) adding \emph{momentum} which is proportional to the number of workers, since adding more workers actually \emph{adds} more ``memory'' about previous parameterizations. The authors formalize this by probabilistically estimating the expected change between $\tilde{\theta}_{t+1}$ and $\tilde{\theta}_t$. Using some additional additional assumptions, such as the expected staleness $\mathbf{E}[\tau] = (n - 1)$, and geometrically distributed staleness, the authors are able to formalize the expected update in an asynchronous setting between update $t$ and $t + 1$, which is shown in Equation~\ref{eq:implicit_momentum}.\\
+However, experiments have shown that removing the synchronization barrier actually allows models to converge~\cite{dean2012large, zhang2015deep, hadjis2016omnivore}, even when most workers update the central variable using a gradient based on an outdated parameterization of the central variable. An other issue, which only has been formalized recently, is \emph{Implicit Momentum} or \emph{Asynchrony Induced Momentum}~\cite{implicitmomentum}. The main reasoning behind implicit momentum, which will be discussed in detail in Section~\ref{sec:implicit_momentum}, is based on a very simple but powerful idea. The idea states that \emph{memory arizes from asynchrony}. Intuitively, this implies that ``memory'' of previous gradients is preserved due to \emph{stale gradient} updates. This can be observed directly from Figure~\ref{fig:intro_asyn_data_parallelism}, where the update of $w_2$ is actually updating the central variable with a gradient identical to $\nabla_\theta \mathcal{L}_1(\tilde{\theta}_t)$ if we assume that both workers computed the gradient based on the same input data. This is a clear indication that asynchronous data parallelism is \emph{implicitly} (because of the asynchronous nature of the approach) adding \emph{momentum} which is proportional to the number of workers, since adding more workers actually \emph{adds} more ``memory'' about previous parameterizations. The authors formalize this by probabilistically estimating the expected change between $\tilde{\theta}_{t+1}$ and $\tilde{\theta}_t$. Using some additional additional assumptions, such as the expected staleness $\mathbf{E}[\tau] = (n - 1)$, and geometrically distributed staleness, the authors are able to formalize the expected update in an asynchronous setting between update $t$ and $t + 1$, which is shown in Equation~\ref{eq:implicit_momentum}.
 
 \begin{equation}
   \label{eq:implicit_momentum}
@@ -539,7 +539,7 @@ v    \draw[gray] (#1 - 0.5,#2) -- (#1 - 0.125, #2 - 0.25);
   \label{fig:introduction_data_parallelism_schematic}
 \end{figure}
 
-Nevertheless, the most common and one of the earliest asynchronous optimization algorithm is \textsc{downpour}~\cite{dean2012large}. We will use \textsc{downpour} as a baseline performance indicator for all our experiments with other distributed optimization algorithms. In essence, workers are continuously committing gradients to the parameter server using Equation~\ref{eq:downpour_worker}. After a gradient has been committed to the parameter server, the worker will \emph{pull} the most recent parameterization from the parameter server in order to be consistent with the updates of other workers, as in Algorithm~\ref{algo:data_parallelism_worker} and~\ref{algo:data_parallelism_parameter_server}.
+Nevertheless, the most common and one of the earliest asynchronous optimization algorithm is \textsc{downpour}~\cite{dean2012large}. In this Master Thesis, we use \textsc{downpour} as a baseline performance indicator for all our experiments with other distributed optimization algorithms. In essence, workers are continuously committing gradients to the parameter server using Equation~\ref{eq:downpour_worker}. After a gradient has been committed to the parameter server, the worker will \emph{pull} the most recent parameterization from the parameter server in order to be consistent with the updates of other workers, as in Algorithm~\ref{algo:data_parallelism_worker} and~\ref{algo:data_parallelism_parameter_server}.
 
 \begin{equation}
   \label{eq:downpour_worker}
@@ -548,12 +548,39 @@ Nevertheless, the most common and one of the earliest asynchronous optimization 
 
 \newpage
 
-Once the parameter server received the update $\Delta\theta^k$ from worker $k$, the parameter server will simply add (since the worker already negated the gradient) the update to the current central variable in order to produce $\tilde{\theta}_{t+1}$.
+Once the parameter server received the update $\Delta\theta^k$ from worker $k$, the parameter server will simply add (since the worker already negated the gradient) the update to the current central variable in order to produce $\tilde{\theta}_{t+1}$, this is described by Equation~\ref{eq:downpour_parameter_server}.
 
 \begin{equation}
   \label{eq:downpour_parameter_server}
   \tilde{\theta}_{t+1} = \tilde{\theta}_t + \Delta \theta^k
 \end{equation}
+
+Furthermore, in order to examine the scaling abilities of the optimization algorithms we discuss in the following chapters, we need a measure to express how well they are performing in a given scenario. To measure this, one could use more traditional metrics such as \emph{statistical efficiency} and \emph{hardware efficiency}~\cite{hadjis2016omnivore, implicitmomentum}.\\
+
+\textbf{Statistical efficiency} (SE) describes the number of iterations that are required to obtain a desired result. In the context of Machine Learning, statistical efficiency describes the number of model updates that have to be performed in order to acquire a desired accuracy. However, in order to obtain some metric about a specific optimization algorithm, we need a baseline to compare against. As stated above, the baseline algorithm we use in this work is \textsc{downpour}. Once we evaluated an algorithm $\epsilon$, we compute the statistical efficiency of $\epsilon$ compared to \textsc{downpour}, as described by Equation~\ref{eq:statistical_efficiency}.
+
+\begin{equation}
+  \label{eq:statistical_efficiency}
+  \frac{SE(\textsc{downpour})}{SE(\epsilon)}
+\end{equation}
+
+\textbf{Hardware efficiency} (HE) on the other hand, describes the amount of time it takes to execute a single iteration of a loop. In our work, this denotes the time it takes to complete a \emph{single} epoch.
+
+\begin{equation}
+  \label{eq:hardware_efficiency}
+  \frac{HE(\textsc{downpour})}{HE(\epsilon)}
+\end{equation}
+
+Nonetheless, during this work, we experimented with several optimization algorithms which actually compute several gradients locally, and preprocesses them before transmitting the update to the parameter server~\cite{zhang2015deep}. In these cases, if someone would employ statistical or hardware efficiency to obtain a performance indicator compared to an other algorithm, they will have a clear advantage since a significantly smaller number of central variable updates occur. Furthermore, usually these algorithms also spend less time consuming all the data since parameter server updates occur less frequents. Moreover, the network is also less saturated due to the reduced number of parameter server updates. In order to have a non-biased metric among different distributed optimization algorithms, we should look at the time it takes to obtain a desired accuracy. We call this \emph{temporal efficiency}.\\
+
+\textbf{Temporal efficiency} (TE) characterizes the amount of time a process, or a collection of processes, take in order to obtain a desired accuracy.
+
+\begin{equation}
+  \label{eq:temporal_efficiency}
+  \frac{TE(\textsc{downpour})}{TE(\epsilon)}
+\end{equation}
+
+Temporal efficiency in effect propertional to statistical efficiency, i.e., $SE(\epsilon) \propto TE(\epsilon)$. However, this is only the case when algorithm $\epsilon$ actually transmits an update to the parameter server after a worker computed a gradient (in an asynchronous setting). This is in contrast with algorithms such as~\cite{zhang2015deep}, where some additional samples are evaluated locally, before an update is transmitted to the parameter server.
 
 \vspace*{\fill}
 
@@ -576,8 +603,6 @@ Once the parameter server received the update $\Delta\theta^k$ from worker $k$, 
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
-
-\vspace*{1cm}
 
 % Define the general commit update mechanism.
 \begin{algorithm}
