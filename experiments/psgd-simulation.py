@@ -7,7 +7,7 @@ Author: Joeri R. Hermans
 
 import argparse
 
-import cPickle as pickle
+import pickle
 
 import copy
 
@@ -53,6 +53,11 @@ X = np.linspace(-r, r, 1000)
 X, Y = np.meshgrid(X, X)
 Z = (X + 2*Y - 7)**2 + (2 * X + Y - 5)**2
 
+# For plotting.
+Y_loss = []
+
+g_max_updates = 10000
+
 ## END Globals. ################################################################
 
 def get_position(model):
@@ -80,8 +85,8 @@ def catch_signals():
 
 def allocate_settings():
     settings = {}
-    settings['communication_window'] = 15
-    settings['learning_rate'] = 0.0001
+    settings['communication_window'] = 1
+    settings['learning_rate'] = 0.01
 
     return settings
 
@@ -158,6 +163,7 @@ def update_visualization():
 def main():
     global g_num_workers
     global g_port_ps
+    global g_max_updates
 
     catch_signals()
     process_arguments()
@@ -220,25 +226,24 @@ class worker(threading.Thread):
         delta = np.asarray([0.0, 0.0])
         while self.running:
             g = get_gradient(self.model)
-            delta -= learning_rate * g
+            delta = learning_rate * g
+            self.model -= delta
             # Apply gradient update.
             if update % communication_window == 0:
-                #delta /= communication_window
-                #t = np.abs(cv - self.center_variable)
-                #t = 1 / (np.exp(t))
-                #delta = np.multiply(t, delta)
-                self.commit(delta)
-                delta.fill(0.0)
                 cv = self.pull()
-                #cv = self.pull()
-                self.center_variable = cv
-                self.model = cv
+                self.center_variable = cv.copy()
+                e = learning_rate * 100.0 * (self.model - self.center_variable)
+                self.commit(e)
+                self.model -= e
             # Increment update counter.
             update += 1
 
     def run(self):
         time.sleep(2)
-        self.process_gradients()
+        try:
+            self.process_gradients()
+        except Exception as e:
+            self.running = False
 
 class parameter_server(threading.Thread):
 
@@ -249,6 +254,8 @@ class parameter_server(threading.Thread):
         self.mutex = threading.Lock()
         self.connections = []
         self.running = False
+        self.update = 0
+        self.times = []
         self.socket = None
 
     def get_center_variable(self):
@@ -267,11 +274,24 @@ class parameter_server(threading.Thread):
         self.socket = fd
 
     def handle_commit(self, conn, addr):
+        global Y_loss
+        global g_max_updates
+
         data = recv_data(conn)
         delta = data['delta']
         with self.mutex:
             self.center_variable += delta
-            print("Error: " + str(get_position(self.center_variable)))
+            self.update += 1
+            self.times.append(time.time())
+            loss = get_position(self.center_variable)
+            Y_loss.append(loss)
+            print("Update: " + str(self.update))
+            if self.update == g_max_updates:
+                self.running = False
+                X = np.arange(g_max_updates)
+                times = np.asarray(self.times)
+                plt.plot(X, Y_loss)
+                plt.show()
 
     def handle_pull(self, conn, addr):
         with self.mutex:
@@ -301,13 +321,15 @@ class parameter_server(threading.Thread):
         super(parameter_server, self).start()
 
     def run(self):
+        # Run the parameter server.
         while self.running:
             try:
                 conn, addr = self.socket.accept()
                 thread = threading.Thread(target=self.handle_connection, args=(conn,addr))
                 thread.start()
                 self.connections.append(thread)
-            except:
+            except Exception as e:
+                print(e)
                 pass
 
     def stop(self):
@@ -336,7 +358,7 @@ def recvall(connection, num_bytes):
         connection: socket. Opened socket.
         num_bytes: int. Number of bytes to read.
     """
-    byte_buffer = ''
+    byte_buffer = b''
     buffer_size = 0
     bytes_left = num_bytes
     # Iterate until we received all data.
@@ -365,7 +387,6 @@ def recv_data(connection):
     # Arguments
         connection: socket. Opened socket.
     """
-    data = ''
     # Fetch the serialized data length.
     length = int(recvall(connection, 20).decode())
     # Fetch the serialized data.
