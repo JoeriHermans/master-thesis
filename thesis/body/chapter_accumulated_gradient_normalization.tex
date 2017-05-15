@@ -12,5 +12,9 @@
 
 \begin{equation}
   \label{eq:accumulated_gradient_normalization}
-  \Delta\theta = -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla f(\theta_i;x_{ij};y_{ij})}{\lambda}
+  \Delta\theta = -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;\textbf{x}_{ij};\textbf{y}_{ij})}{\lambda}
+\end{equation}
+
+\begin{equation}
+  \lim_{\lambda \to \infty} -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;\textbf{x}_{ij};\textbf{y}_{ij})}{\lambda}
 \end{equation}
