@@ -56,7 +56,10 @@ Z = (X + 2*Y - 7)**2 + (2 * X + Y - 5)**2
 # For plotting.
 Y_loss = []
 
-g_max_updates = 10000
+g_max_updates = 2000
+
+anim = None
+original_sigint = signal.getsignal(signal.SIGINT)
 
 ## END Globals. ################################################################
 
@@ -77,7 +80,14 @@ def allocate_model():
     return model
 
 def signal_sigint(signal, frame):
+    signal.signal(signal.SIGINT, original_sigint)
     print("SIGINT received")
+    global anim
+
+    print("Saving animation.")
+    anim.save('/home/joeri/easgd.gif', dpi=80, writer='imagemagick')
+    print("Animation saved")
+    time.sleep(5)
     os.system('kill %d' % os.getpid())
 
 def catch_signals():
@@ -123,6 +133,7 @@ def allocate_workers(model):
         w.start()
 
 def update_visualization():
+    global anim
     global g_num_workers
     global g_parameter_server
     global g_workers
@@ -161,17 +172,19 @@ def update_visualization():
     plt.show()
 
 def main():
+    global anim
     global g_num_workers
     global g_port_ps
     global g_max_updates
 
-    catch_signals()
-    process_arguments()
-    model = allocate_model()
-    allocate_parameter_server(model)
-    allocate_workers(model)
-    update_visualization()
-    signal.pause()
+    try:
+        process_arguments()
+        model = allocate_model()
+        allocate_parameter_server(model)
+        allocate_workers(model)
+        update_visualization()
+    except KeyboardInterrupt:
+        print("W: interrupt received, stopping…")
 
 ## BEGIN Classes. ##############################################################
 
@@ -276,6 +289,7 @@ class parameter_server(threading.Thread):
     def handle_commit(self, conn, addr):
         global Y_loss
         global g_max_updates
+        global anim
 
         data = recv_data(conn)
         delta = data['delta']
@@ -285,13 +299,15 @@ class parameter_server(threading.Thread):
             self.times.append(time.time())
             loss = get_position(self.center_variable)
             Y_loss.append(loss)
-            print("Update: " + str(self.update))
+            print(self.update)
             if self.update == g_max_updates:
+                print("Saving")
+                try:
+                    anim.save('easgd.gif', dpi=80, writer='imagemagick')
+                except Exception as e:
+                    print(e)
+                print("Saved")
                 self.running = False
-                X = np.arange(g_max_updates)
-                times = np.asarray(self.times)
-                plt.plot(X, Y_loss)
-                plt.show()
 
     def handle_pull(self, conn, addr):
         with self.mutex:
