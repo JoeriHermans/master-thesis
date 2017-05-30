@@ -10,6 +10,11 @@
 \chapter{Distributed Deep Learning}
 \label{chapter:distributed_deep_learning}
 
+In this chapter, we introduce several concepts and techniques related to Distributed Deep Learning on which this works builts upon. We start in Section~\ref{sec:ddl_introduction} with a high-level description of all concepts and methods. Afterwards, we continue with \emph{mini-batch parallelism} as it is a very intuitive method. Next, we discuss asynchronous optimization methods such as \textsc{downpour} and closely related extensions. Furthermore, we address several issues such as \emph{asynchrony induced momentum} which are related to asynchronous optimization. In order to address these problems, we consider several approaches which provide a possible solution to these issues. Finally, in Section~\ref{sec:easgd}, we examine a method called \textsc{easgd} which tries to solve the optimization problem under communication constraints.
+
+\section{Introduction}
+\label{sec:ddl_introduction}
+
 \section{Synchronous Data Parallelism}
 \label{sec:synchronous_data_parallelism}
 
