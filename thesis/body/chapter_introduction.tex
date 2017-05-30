@@ -361,13 +361,13 @@ However, experiments have shown that removing the synchronization barrier actual
   \mathbf{E}[\tilde{\theta}_{t+1} - \tilde{\theta}_t] = \Bigg( 1 - \frac{1}{n} \Bigg) \mathbf{E}[\tilde{\theta}_t - \tilde{\theta}_{t-1}] - \frac{\eta}{n} \mathbf{E} \nabla_\theta \mathcal{L}(\tilde{\theta}_t~;~\textbf{x}~;~\textbf{y})
 \end{equation}
 
-Using Equation~\ref{eq:implicit_momentum}, we can immediatly derrive the term which describes the implicit momentum induced by asynchrony, which is $\big(1 - \frac{1}{n}\big)$. This result actually suggests that there is a limit to asynchronous optimization: since every problem has some optimal momentum term, which implies that there is an optimal number of asynchronous workers for a specific problem. In order to push the limits of asynchronous optimization, the authors propose various techniques to reduce the abundant amount of implicit momentum. One approach is to apply a \emph{grid-search} to find the optimal hyperparameterization for a given epoch, this also includes the number of workers. Despite that this technique finds the optimal hyperparameterization for a given epoch, the disadvantage is that after every fixed number of iterations, a grid-search of the hyperparameters has to be performed to ensure (optimal) convergence. This is actually in accordance with training in non-data parallel settings, where one starts with a smaller momentum hyperparameter because the gradients at the start will be relatively large compared to the gradients near an optimum, where usually one benifits from a larger momentum hyperparameter. From this intuition we can actually deduce that when the gradient updates are large compared to the gradients close to an optimum, an optimizer does not benifit from high parallelism because the workers are committing a gradient which was based on a parametrization which is ``far'' from the current central variable, thus obtaining implicit momentum. Furthermore, one could eliminate the need for the gridsearch by constructing a distributed optimization scheme which is based on the idea described in Hypothesis~\ref{hyp:local_optimization}.
+Using Equation~\ref{eq:implicit_momentum}, we can immediatly derrive the term which describes the implicit momentum induced by asynchrony, which is $\big(1 - \frac{1}{n}\big)$. This result actually suggests that there is a limit to asynchronous optimization: since every problem has some optimal momentum term, which implies that there is an optimal number of asynchronous workers for a specific problem. In order to push the limits of asynchronous optimization, the authors propose various techniques to reduce the abundant amount of implicit momentum. One approach is to apply a \emph{grid-search} to find the optimal hyperparameterization for a given epoch, this also includes the number of workers. Despite that this technique finds the optimal hyperparameterization for a given epoch, the disadvantage is that after every fixed number of iterations, a grid-search of the hyperparameters has to be performed to ensure (optimal) convergence. This is actually in accordance with training in non-data parallel settings, where one starts with a smaller momentum hyperparameter because the gradients at the start will be relatively large compared to the gradients near an optimum, where usually one benifits from a larger momentum hyperparameter. From this intuition we can actually deduce that when the gradient updates are large compared to the gradients close to an optimum, an optimizer does not benifit from high parallelism because the workers are committing gradients which were based on a parametrization which is ``far'' from the current central variable, thus obtaining implicit momentum. Furthermore, one could eliminate the need for the gridsearch by constructing a distributed optimization scheme which is based on the idea described in Hypothesis~\ref{hyp:local_optimization}.
 
 \begin{hyp}[H\ref{hyp:local_optimization}] \label{hyp:local_optimization}
   Workers only contribute efficiently to the central objective when they commit gradients which are based on variables close to the central variable.
 \end{hyp}
 
-This implies that in the precense of high parallelism, only gradient updates which are based on variables close to the \emph{current} central variable should matter. This intuition is strengthened in Figure~\ref{fig:async_momentum}, where a straggler is causing the central variable to converge to a different solution as opposed to the one it was heading to first. A lot of methodologies have been suggested to handle the stragler problem, however, most approaches suggest a synchronous bounded staleness approach~\cite{cipar2013solving, ho2013more}. As a result, the error introduced by staleness is limited~\cite{ho2013more}. Nevertheless, in gradient-based approaches, the straggler problem can be approached from a different perspective. By incorperating Hypothesis~\ref{hyp:local_optimization}, we could eliminate additional engineering efforts since stale updates, and thus straglers, are built in the optimization procedure.
+This implies that in the precense of high parallelism, only gradient updates which are based on variables close to the \emph{current} central variable matter. This intuition is strengthened in Figure~\ref{fig:async_momentum}, where a straggler is causing the central variable to converge to a different solution as opposed to the one it was heading to first. A lot of methodologies have been suggested to handle the stragler problem, however, most approaches suggest a synchronous bounded staleness approach~\cite{cipar2013solving, ho2013more}. As a result, the error introduced by staleness is limited~\cite{ho2013more}. Nevertheless, in gradient-based approaches, the straggler problem can be approached from a different perspective. By incorperating Hypothesis~\ref{hyp:local_optimization}, we could eliminate additional engineering efforts since stale updates, and thus straglers, are built in the optimization procedure.
 
 \begin{figure}[H]
   \centering
@@ -564,24 +564,11 @@ Furthermore, in order to examine the scaling abilities of the optimization algor
   \frac{SE(\textsc{downpour})}{SE(\epsilon)}
 \end{equation}
 
-\textbf{Hardware efficiency} (HE) on the other hand, describes the amount of time it takes to execute a single iteration of a loop. In our work, this denotes the time it takes to complete a \emph{single} epoch.
+\textbf{Hardware efficiency} (HE) on the other hand, describes the amount of time it takes to execute a single iteration of a loop. In our work, this denotes the time it takes to complete a \emph{single} epoch. Nonetheless, during this work, we experimented with several optimization algorithms which actually compute several gradients locally, and preprocess them before transmitting the update to the parameter server~\cite{zhang2015deep}. In these cases, if someone would employ statistical or hardware efficiency to obtain a performance indicator compared to an other algorithm, they will have a clear advantage since a significantly smaller number of central variable updates occur. Furthermore, usually these algorithms also spend less time consuming all the data since parameter server updates occur less frequent. Moreover, the network is also less saturated due to the reduced number of parameter server updates. In order to have a non-biased metric among different distributed optimization algorithms, we should look at the time it takes to obtain a desired accuracy. We call this \emph{temporal efficiency}.\\
 
-\begin{equation}
-  \label{eq:hardware_efficiency}
-  \frac{HE(\textsc{downpour})}{HE(\epsilon)}
-\end{equation}
+\textbf{Temporal efficiency} (TE) characterizes the amount of time a process, or a collection of processes, requires in order to obtain a desired accuracy. Temporal efficiency is in effect propertional to statistical efficiency, i.e., $SE(\epsilon) \propto TE(\epsilon)$. However, this is only the case when algorithm $\epsilon$ actually transmits an update to the parameter server after a worker computed a gradient (in an asynchronous setting). This is in contrast with algorithms such as~\cite{zhang2015deep}, where some additional samples are evaluated locally, before an update is transmitted to the parameter server.
 
-Nonetheless, during this work, we experimented with several optimization algorithms which actually compute several gradients locally, and preprocesses them before transmitting the update to the parameter server~\cite{zhang2015deep}. In these cases, if someone would employ statistical or hardware efficiency to obtain a performance indicator compared to an other algorithm, they will have a clear advantage since a significantly smaller number of central variable updates occur. Furthermore, usually these algorithms also spend less time consuming all the data since parameter server updates occur less frequents. Moreover, the network is also less saturated due to the reduced number of parameter server updates. In order to have a non-biased metric among different distributed optimization algorithms, we should look at the time it takes to obtain a desired accuracy. We call this \emph{temporal efficiency}.\\
-
-\textbf{Temporal efficiency} (TE) characterizes the amount of time a process, or a collection of processes, take in order to obtain a desired accuracy.
-
-\begin{equation}
-  \label{eq:temporal_efficiency}
-  \frac{TE(\textsc{downpour})}{TE(\epsilon)}
-\end{equation}
-
-Temporal efficiency in effect propertional to statistical efficiency, i.e., $SE(\epsilon) \propto TE(\epsilon)$. However, this is only the case when algorithm $\epsilon$ actually transmits an update to the parameter server after a worker computed a gradient (in an asynchronous setting). This is in contrast with algorithms such as~\cite{zhang2015deep}, where some additional samples are evaluated locally, before an update is transmitted to the parameter server.
-
+\newpage
 \vspace*{\fill}
 
 % Define the general data parallel worker algorithm.
@@ -603,6 +590,8 @@ Temporal efficiency in effect propertional to statistical efficiency, i.e., $SE(
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
+
+\vspace*{3cm}
 
 % Define the general commit update mechanism.
 \begin{algorithm}
