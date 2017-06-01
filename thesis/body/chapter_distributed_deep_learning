@@ -10,41 +10,17 @@
 \chapter{Distributed Deep Learning}
 \label{chapter:distributed_deep_learning}
 
-In this chapter, we introduce several concepts and techniques related to Distributed Deep Learning on which this works builts upon. We start in Section~\ref{sec:ddl_introduction} with a high-level description of all concepts and methods. Afterwards, we continue with \emph{mini-batch parallelism} as it is a very intuitive method. Next, we discuss asynchronous optimization methods such as \textsc{downpour} and closely related extensions. Furthermore, we address several issues such as \emph{asynchrony induced momentum} which are related to asynchronous optimization. We also consider several approaches which provide a possible solution to these issues. Finally, in Section~\ref{sec:easgd}, we examine a method called \textsc{easgd} which solves the optimization problem under communication constraints.
+In this chapter, we introduce several concepts and techniques related to Distributed Deep Learning on which this works builts upon. We start in Section~\ref{sec:ddl_introduction} with a recap of all methods and techniques we have discussed in Chapter~\ref{chapter:introduction}. Afterwards, we continue with a discussion of synchronous followed by an examination of asynchronous optimization methods such as \textsc{downpour} and closely related extensions. Furthermore, we address several issues such as \emph{asynchrony induced momentum} which are related to asynchronous optimization. We also consider several approaches which provide a possible solution to these issues.
 
 \section{Introduction}
 \label{sec:ddl_introduction}
 
-For all practical applications, Stochastic Gradient Descent (\textsc{sgd}) and derrivatives are the best tools from the numerical optimization toolbox for neural networks. However, applying \textsc{sgd} in its pure form, i.e., updating the parameters after evaluating a training sample, is a computationally intensive process. An initial approach for speeding up \textsc{sgd} in terms of convergence with respect to training time was to compute the gradients of several samples, a \emph{mini-batch}, and average them. This approach has several advantages, the first being that a larger mini-batch will result in less noisy updates, as more ``evidence'' of the surrounding error space will provide a better gradient update. The second advantage is computationally, since all sub-gradients (gradients of the training samples in the mini-batch) are based upon the same parametrization of the model. As a result, the parallelization of the gradient computation is quite straightforward. For instance, for every training sample in a mini-batch a thread, process, or even a different machine (see Figure~\ref{fig:distributed_mini_batch_parallelism}) can be allocated to compute the gradient in parallel. However, a blocking mechanism is required in order to sum all gradients, average them, and finally update the parametrization of the model. This process is depicted in Figure~\ref{fig:minibatch_data_parallelism}.
+For all practical applications, Stochastic Gradient Descent (\textsc{sgd}) and derrivatives are the best tools from the numerical optimization toolbox for neural networks. However, applying \textsc{sgd} in its pure form, that is, updating the parameters after evaluating a training sample, is a computationally intensive process. An initial approach for speeding up \textsc{sgd} in terms of convergence with respect to training time was to compute the gradients of several samples, a \emph{mini-batch}, and average them. This approach has several advantages, the first being that a larger mini-batch will result in less noisy updates, as more ``evidence'' of the surrounding error space will provide a better gradient update. The second advantage being the increased computational parallelism, since all sub-gradients (gradients of the training samples in the mini-batch) are based upon the same parametrization of the model. As a result, the parallelization of the gradient computation is quite straightforward. For instance, for every training sample in a mini-batch, one could allocate a thread, a process, or even a different machine (see Figure~\ref{fig:distributed_mini_batch_parallelism}) to compute the gradients in parallel. However, a blocking mechanism is required in order to sum all gradients, average them, and finally update the parametrization of the model. This process is depicted in Figure~\ref{fig:minibatch_data_parallelism}. As discussed in Chapter~\ref{chapter:introduction}, mini-batch parallelism is an instance of \emph{synchronous data parallelism}. Although many synchronous optimization schemes share a similar structure, we discuss other instances of synchronous data parallelism in particular in Section~\ref{sec:synchronous_data_parallelism} since these optimization schemes incorperate gradients and worker parameterizations into the central variable differently compared to mini-batch parallelism.\\
 
+Nevertheless, a significant, but albeit technical issue in synchronous optimization is that when a single or multiple workers are slowed down for some reason, e.g., due to high CPU load, or bandwidth consumption, other workers will have to wait before they can continue with step $t + 1$. As a result, the allocated resources are not fully utilized. This particular issue is known in literature as the \emph{straggler} problem. However, this problem can be mitigated with by using a \emph{homogeneous} hardware configuration. For instance, when one would employ 2 different GPU's running at different clock speeds, a \emph{heteregenous} hardware configuration, then the CPU will always have to wait for a particulur GPU since it runs at a lower clock speed causing the complete training procedure to be slowed down\footnote{A chain is only as strong as its weakest link.}. Furthermore, we could argue that there is a limit to synchronous data parallism because simply \emph{adding more workers to the problem implicitly increases the size of the mini-batch}. As a result, when applying synchronous data parallelism, one is typically not parallelizing gradient descent in the typical sense, but rather parallelizing the computations within a step.
 
 \section{Synchronous Data Parallelism}
 \label{sec:synchronous_data_parallelism}
-
-\begin{figure}[H]
-  \centering
-  \begin{tikzpicture}
-    % Draw the timeline of the data parallelism.
-    \draw[->] node[left] {$t$} (0,0) -- (10,0);
-    % Draw synchronization.
-    \draw[->] (1,0) -- (1,-1) node[midway, left] {\small Pull $\widetilde{\theta}$};
-    \draw (1,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1, ..., w_n$};
-    % Draw commits.
-    %% 1
-    \draw[->] (4,-1) -- (4,0) node[midway, left] {\small Commit $\nabla f_1$};
-    \draw (4,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1$};
-    %% 2
-    \draw[->] (4.6,-2) -- (4.6,0) node[midway, right] {\small Commit $\nabla f_2$};
-    \draw (4.6,-2.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_n$};
-    % Draw PS processing.
-    \draw (7,0) -- (7,-1.6);
-    \draw (7,-1.86) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {Process variables};
-     % Draw synchronization.
-    \draw[->] (9,0) -- (9,-1) node[midway, left] {\small Pull $\widetilde{\theta}$};
-    \draw (9,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1, ..., w_n$};
-  \end{tikzpicture}
-  \caption{Caption here}
-\end{figure}
 
 \subsection{Model Averaging}
 \label{sec:model_averaging}
@@ -140,38 +116,17 @@ For all practical applications, Stochastic Gradient Descent (\textsc{sgd}) and d
 \section{Asynchronous Data Parallelism}
 \label{sec:asynchronous_data_parallelism}
 
-\begin{figure}[H]
-  \centering
-  \begin{tikzpicture}
-    % Draw the timeline of the data parallelism.
-    \draw[->] node[left] {$t$} (0,0) -- (10,0);
-    %% 1
-    \draw[->] (0.9, -1) -- (0.9, 0) node[midway, left] {\small Commit $\nabla f_1$};
-    \draw[->] (1.1, 0) -- (1.1, -1) node[midway, right] {\small Pull $\widetilde{\theta}$};
-    \draw (1,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1$};
-    %% 2
-    \draw[->] (4.5, -1) -- (4.5, 0) node[midway, left] {\small Commit $\nabla f_2$};
-    \draw[->] (4.7, 0) -- (4.7, -1) node[midway, right] {\small Pull $\widetilde{\theta}$};
-    \draw (4.6,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_2$};
-    %% 1
-    \draw[->] (8.5, -1) -- (8.5, 0) node[midway, left] {\small Commit $\nabla f_1$};
-    \draw[->] (8.7, 0) -- (8.7, -1) node[midway, right] {\small Pull $\widetilde{\theta}$};
-    \draw (8.6,-1.25) node[rectangle,rounded corners,inner sep=4pt, draw=black!50] {$w_1$};
-    %% Draw staleness.
-    \draw [decorate,decoration={brace,amplitude=10pt}]
-      (1,0.1) -- (8.6,0.1) node [black,midway,yshift=16pt] {\small $\tau$: Staleness of $w_1$};
-  \end{tikzpicture}
-  \caption{Caption here.}
-\end{figure}
+\subsection{DOWNPOUR}
+\label{sec:downpour}
+
+\subsection{Dynamic SGD}
+\label{sec:dyn_sgd}
 
 \subsection{Asychrony Induced Momentum}
 \label{sec:implicit_momentum}
 
-\subsection{Hogwild!}
-\label{sec:hogwild}
-
-\subsection{DOWNPOUR}
-\label{sec:downpour}
-
 \subsection{Asynchronous Elastic Averaging SGD}
 \label{sec:aeasgd}
+
+\section{Hybrids}
+\label{sec:hybrids}
