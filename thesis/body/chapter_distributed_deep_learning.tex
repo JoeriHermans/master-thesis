@@ -188,18 +188,18 @@ Contrary to other synchronous methods, model averaging does not reduce the train
   \label{fig:model_averaging_intuition}
 \end{figure}
 
-Nevertheless, what is interesting about the random initialization of workers, is that when we increase the number of workers, the probability that we will find a better solution (minima) compared to a sequential optimization process increases. However, this also depends on the curvature of the error space. For example, in Figure~\ref{fig:model_averaging_prob} we use Beale's function to obtain our statistic. However, from the plots we can deduce that the curvature of the error space is slightly biased towards the global minimum if first-order gradients are used. If the error space was not biased towards a specific minima, the statistic for a single worker under different hyperparameterizations should be 50\%.
+Nevertheless, what is interesting about the random initialization of workers, is that when we increase the number of workers, the probability that we will find a better solution (minima) compared to a sequential optimization process increases. However, this also depends on the curvature of the error space. For example, in Figure~\ref{fig:model_averaging_prob} we use Beale's function to obtain our statistic. However, from the plots we can deduce that the curvature of the error space is slightly biased towards the global minimum if first-order gradients are used. If the error space was not biased towards a specific minima, the statistic for a single worker under different hyperparameterizations should be 50\%.\\
 
 Furthermore, what is the role of the exploration parameter $\lambda$? Does it contribute to to the optimization process besides reducing the amount of communication with the parameter server by increasing the amount of local work? In principle this would help to optimization process since more exploration of the parameter space occurs, and as a result, better updates are applied. Remember what we said in Section~\ref{sec:ddl_introduction} on synchronous data parallelism, that effectivly increasing the number of workers implicitly increases the size of the mini-batch. Yet, in this particular case there is a subtle difference, i.e., local exploration of the parameter space. As a result, it is not (really) implicitly increasing the size of the mini-batch since some form of local exploration occurs. As a result, the averaged central variable will produce a less-noisy consensus based on the (local) exploration of the error space.  However, the problem lies in the fact when different sets of workers enter different minima, possible because of too much exploration of the error space as depicted in Figure~\ref{fig:model_averaging_intuition}. Because if this occurs, then the averaging step could potentially reset the situation instead of continuing exploring a single minima.
 
 \begin{figure}
   \centering
-  \begin{subfigure}{.45\textwidth}
+  \begin{subfigure}{.4\textwidth}
     \centering
     \includegraphics[width=\linewidth]{resources/images/model_averaging_prob_1}
     \caption{$\lambda = 1$}
   \end{subfigure}
-  \begin{subfigure}{.45\textwidth}
+  \begin{subfigure}{.4\textwidth}
     \centering
     \includegraphics[width=\linewidth]{resources/images/model_averaging_cf_100_prob}
     \caption{$\lambda = 100$}
