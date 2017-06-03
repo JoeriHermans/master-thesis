@@ -66,6 +66,63 @@ In a previous paragraph we said that there is a limit to mini-batch parallelism,
 \subsection{Model Averaging}
 \label{sec:model_averaging}
 
+As the name suggests, model averaging optimizes the central variable by simply averaging the parametrizations of the workers after $\lambda$ (which could be the amount of data in a single epoch) steps until all data has been consumed. As mentioned before, hyperparameter $\lambda$ denotes the number of \emph{local} steps that have to be performed before the results are communicated with the parameter server. The optimization procedure in the worker and parameter server are quite straightforward, and are described in Equation~\ref{eq:model_averaging_worker_update} and Equation~\ref{eq:model_averaging_ps_update} respectively. However, Equation~\ref{eq:model_averaging_worker_update} has the disadvantage that a lot of communication with the parameter server has to be performed, since after every \emph{local} worker update all parameters have to be shipped to the parameter server to apply Equation~\ref{eq:model_averaging_ps_update}. Furthermore, this approach has several other issues that will be discussed later. But for now we can resolve this issue by delaying a commit to the parameter server by doing several \emph{local} ($\lambda$) updates before sending $\theta^k_t$ to the parameter server, this is shown in Algorithm~\ref{algo:model_averaging_worker}.
+
+\begin{equation}
+  \label{eq:model_averaging_worker_update}
+  \theta^k_{t+1} = \theta^k_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x}^k_t;\textbf{y}^k_t)
+\end{equation}
+
+\begin{equation}
+  \label{eq:model_averaging_ps_update}
+  \tilde{\theta}_{t+1} = \frac{1}{n}\sum^n_{i=1} \theta^i_t
+\end{equation}
+
+Contrary to other synchronous methods, model averaging does not reduce the training time in general. In fact, it requires more resources to achieve the same results since the central variable is set to be the average of all workers. This is shown in Figure~\ref{fig:model_averaging_slow} (a) since all workers follow the same first-order path, synchronize, and average the parameters after $\lambda$ steps to start again from the averaged parameterization, which is in this case the central variable. However, what happens if we initialize the parameterizations of the workers randomly? At first, all workers will do some work locally, but after $\lambda$ steps, the parametrizations of the workers are averaged. As a result, all workers share the same parameterization in the next step, which brings us again to our initial scenario as shown in Figure~\ref{fig:model_averaging_slow} (b). Furthermore, when applying random initialization, we could say a ``warmup'' period is required since all workers need to converge a particular solution before convergence can take place. This intuition is strenghtened in Figure~\ref{fig:model_averaging_intuition}.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/model_averaging_identical_starting_point}
+    \caption{Identical initialization}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/model_averaging_cf_10}
+    \caption{Random initialization}
+  \end{subfigure}
+  \caption{In this Figure we show the difference between identical initialization (a), and random initialization (b). In essence, both methods require roughly the same amount of time as a sequential optimization algorithm, i.e., not distributed, while using more resources. However, the difference here is that using random initialization requires a ``warmup'' period (a single parameter server update), before the actual optimization process can start. In order to simulate the stochastic noise of mini-batch gradient descent, we added a noise term to our gradient computations which was sampled from $X \sim \mathcal{N}(\mu = 0,\,\sigma^{2} = 10.0)$ to ensure that some deviation from the central variable was possible.}
+  \label{fig:model_averaging_slow}
+\end{figure}
+
+\newpage
+
+\begin{algorithm}[H]
+  \caption{Describes the worker procedure with local worker exploration. The worker will be identified with a certain index $k$ and will be initialized by assigning the central variable ($\tilde{\theta}_t$) to the worker, or the worker variable can be randomized at the start of the optimization procedure. Furthermore, we introduce a hyperparameter $\lambda$, which is the number of local updates that have to be performed in order the worker parameterization $\theta^k_t$ is communicated with the parameter server.}
+  \label{algo:model_averaging_worker}
+  \begin{algorithmic}[1]
+    \Procedure{ModelAveragingWorker}{$k$}
+    \State $\theta^k_0 \gets \Call{Pull()}{}$ or $\Call{Random()}{}$ \Comment{Worker variable $\theta^k_0$ can be randomized.}
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $i \gets 0$
+    \For{$i < \lambda$}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $\theta^k_{t + 1} \gets \theta^k_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$ \Comment{Optimization step, could be \cite{kingma2014adam}, or other optimizer.}
+    \State $i \gets i + 1$
+    \State $t \gets t + 1$
+    \EndFor
+    \State $\Call{Commit}{\theta^k_t}$
+    \State $\Call{WaitForOtherWorkers()}{}$
+    \State $\theta^k_t \gets \Call{Pull()}{}$
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\vspace*{1cm}
+
 \begin{figure}[H]
   \centering
   %% 1
@@ -127,7 +184,26 @@ In a previous paragraph we said that there is a limit to mini-batch parallelism,
     \draw[dashed, draw=black!30] (5.125,0.3) -- (5.125,1.5);
     \draw[->] (5.95,1.8) -- (7,1.8) node[midway, above] {\small $\Delta\theta_{1-4}$};
   \end{tikzpicture}
-  \caption{Caption here}
+  \caption{This figure explains the intuition behind model averaging. In the first state, all workers, $w_1$, $w_2$, $w_3$, and $w_4$, are uniformly initialized over the hypothesis space. Using the local parametrizations, every worker obtains an update $\Delta w_i$, and applies it locally. Afterwards, all workers send their parametrizations to the parameter server which will average them to obtain a central variable, which is depicted by $C$ in this particular figure. Finally, all workers fetch the most recent central variable, and start computing new gradients based for the following iteration.  Furthermore, what can be observed directly from this figure, is that when the workers do not agree on a \emph{local neighborhood}, the central variable will not be able to converge. This is additional support for Hypothesis~\ref{hyp:local_optimization}.}
+  \label{fig:model_averaging_intuition}
+\end{figure}
+
+Nevertheless, what is interesting about the random initialization of workers, is that when we increase the number of workers, the probability that we will find a better solution (minima) compared to a sequential optimization process increases. However, this also depends on the curvature of the error space. For example, in Figure~\ref{fig:model_averaging_prob} we use Beale's function to obtain our statistic. However, from the plots we can deduce that the curvature of the error space is slightly biased towards the global minimum if first-order gradients are used. If the error space wasn't the case, the statistic for a single worker under different hyperparameterizations should be 50\%.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/model_averaging_prob_1}
+    \caption{$\lambda = 1$}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/model_averaging_cf_100_prob}
+    \caption{$\lambda = 100$}
+  \end{subfigure}
+  \caption{Probability distribution extracted from several Monte-Carlo simulations under different conditions. We find that the probability of reaching the optimum (Beale's function) increases when the number of random initialized workers increases. Despite the fact that we observe that more exploration ($\lambda$) yiels a better statistic, we believe that this result is not significant due to the relatively low number of simulations (1000 per worker per hyperparameter).}
+  \label{fig:model_averaging_prob}
 \end{figure}
 
 \subsection{Elastic Averaging SGD}
