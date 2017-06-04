@@ -190,7 +190,7 @@ Contrary to other synchronous methods, model averaging does not reduce the train
 
 Nevertheless, what is interesting about the random initialization of workers, is that when we increase the number of workers, the probability that we will find a better solution (minima) compared to a sequential optimization process increases. However, this also depends on the curvature of the error space. For example, in Figure~\ref{fig:model_averaging_prob} we use Beale's function to obtain our statistic. However, from the plots we can deduce that the curvature of the error space is slightly biased towards the global minimum if first-order gradients are used. If the error space was not biased towards a specific minima, the statistic for a single worker under different hyperparameterizations should be 50\%.\\
 
-Furthermore, what is the role of the exploration parameter $\lambda$? Does it contribute to to the optimization process besides reducing the amount of communication with the parameter server by increasing the amount of local work? In principle this would help to optimization process since more exploration of the parameter space occurs, and as a result, better updates are applied. Remember what we said in Section~\ref{sec:ddl_introduction} on synchronous data parallelism, that effectivly increasing the number of workers implicitly increases the size of the mini-batch. Yet, in this particular case there is a subtle difference, i.e., local exploration of the parameter space. As a result, it is not (really) implicitly increasing the size of the mini-batch since some form of local exploration occurs. As a result, the averaged central variable will produce a less-noisy consensus based on the (local) exploration of the error space.  However, the problem lies in the fact when different sets of workers enter different minima, possible because of too much exploration of the error space as depicted in Figure~\ref{fig:model_averaging_intuition}. Because if this occurs, then the averaging step could potentially reset the situation instead of continuing exploring a single minima.
+Furthermore, what is the role of the exploration parameter $\lambda$? Does it contribute to to the optimization process besides reducing the amount of communication with the parameter server by increasing the amount of local work? In principle this would help to optimization process since more exploration of the parameter space occurs, and as a result, better updates are applied. Remember what we said in Section~\ref{sec:ddl_introduction} on synchronous data parallelism, that effectivly increasing the number of workers implicitly increases the size of the mini-batch. Yet, in this particular case there is a subtle difference, i.e., local exploration of the parameter space. As a result, it is not (really) implicitly increasing the size of the mini-batch since some form of local exploration occurs. As a result, \emph{the averaged central variable will produce a less-noisy consensus based on the (local) exploration of the error space}.  However, the problem lies in the fact when different sets of workers enter different minima, possible because of too much exploration of the error space as depicted in Figure~\ref{fig:model_averaging_intuition}. Because if this occurs, then the averaging step could potentially reset the situation instead of continuing exploring a single minima.
 
 \begin{figure}
   \centering
@@ -223,7 +223,7 @@ Furthermore, what is the role of the exploration parameter $\lambda$? Does it co
   \begin{subfigure}{.24\textwidth}
     \centering
     \includegraphics[width=\linewidth]{resources/images/model_averaging_cf_100}
-    \caption{$\lambda = 10$}
+    \caption{$\lambda = 100$}
   \end{subfigure}
   \begin{subfigure}{.24\textwidth}
     \centering
@@ -237,6 +237,20 @@ Furthermore, what is the role of the exploration parameter $\lambda$? Does it co
 \subsection{Elastic Averaging SGD}
 \label{sec:easgd}
 
+Elastic Averaging SGD, or \textsc{easgd}~\cite{zhang2015deep}, is a distributed optimization algorithm designed with communication constraints in mind. In essence, \textsc{easgd} could be viewed as an extension of model averaging described in Section~\ref{sec:model_averaging} with the difference that the workers, and the central variable are coordinated using an \emph{elastic force}~\cite{zhang2015deep} instead of averaging the workers after a fixed amount of steps. This means that instead of simply transmitting the parametrization or a gradient to the parameter server, the workers commit an \emph{elastic difference} which is defined as $\eta_t \rho (\theta^k_t - \tilde{\theta}_t)$ where $\rho$ is the \emph{elasticity} hyperparameter. Intuitively, $\rho$ describes the amount of exploration that can be performed by the workers with respect to the central variable $\tilde{\theta}_t$.\\
+
+Assuming $\lambda = 1$, the worker update and central variable update are described in Equation~\ref{eq:easgd_sync_worker}, and Equation~\ref{eq:easgd_sync_ps} respectively. What is different compared to most other optimization schemes, is that the worker update described in Equation~\ref{eq:easgd_sync_worker} has a second component, i.e., the \emph{elastic difference}. Furthermore, note that compared to other distributed optimization schemes, the workers in \textsc{easgd} do not synchronize their parameterization with the central variable as shown in Algorithm~\ref{algo:easgd_worker}, but rather update the central variable using the elastic difference, and than use the new central variable as a new reference point to compute the following elastic differences.
+
+\begin{equation}
+  \label{eq:easgd_sync_worker}
+  \theta^k_{t + 1} = \theta^k_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) - \eta_t\rho(\theta^k_t - \tilde{\theta}_t)
+\end{equation}
+
+\begin{equation}
+  \label{eq:easgd_sync_ps}
+  \tilde{\theta}_{t+1} = \tilde{\theta}_t + \eta_t \sum_{i=0}^n \rho(\theta^i_t - \tilde{\theta}_t)
+\end{equation}
+
 \begin{figure}[H]
   \centering
   \begin{tikzpicture}
@@ -246,17 +260,45 @@ Furthermore, what is the role of the exploration parameter $\lambda$? Does it co
     % Draw the function.
     \draw[samples=400,domain=1:8.8,smooth,variable=\x,black,thick]  plot ({\x},{(1 / (\x - 0.45))});
     % Draw the instances (including the center variable) with the gradient arrows and the elastic difference.
-    \draw (2, 1.8) node[circle, inner sep=2pt, draw=black!50] {$C$};
+    \draw (2, 1.8) node[circle, inner sep=2pt, draw=black!50] {$\tilde{\theta}$};
     \draw[dashed, draw=black!30] (2,0.65) -- (2,1.5);
-    \draw (5, 1.8) node[circle, inner sep=2pt, draw=black!50] {$w$};
-    \draw[dashed, draw=black!30] (5,0.25) -- (5,1.55);
+    \draw (7, 1.8) node[circle, inner sep=2pt, draw=black!50] {$\theta_w$};
+    \draw[dashed, draw=black!30] (7,0.25) -- (7,1.45);
     % Draw the gradients and the elastic force.
-    \draw[->] (5.45,1.8) -- (6.1,1.8) node[right, above] {\small $-\nabla f_w$};
-    \draw[->] (4.55,1.55) -- (4.2,1.55) node[midway, below] {\small $-\eta\rho(\theta_w - \theta_C)$ (small $\rho$)};
-    \draw[->] (4.55,2.05) -- (3.6,2.05) node[midway, above] {\small $-\eta\rho(\theta_w - \theta_C)$ (large $\rho$)};
+    \draw[->] (7.45,1.8) -- (8.1,1.8) node[right, above] {\small $-\nabla_\theta \mathcal{L}_w$};
+    \draw[->] (6.55,1.55) -- (6.2,1.55) node[midway, below] {\small $-\eta\rho(\theta_w - \tilde{\theta})$ (small $\rho$)};
+    \draw[->] (6.55,2.05) -- (5.6,2.05) node[midway, above] {\small $-\eta\rho(\theta_w - \tilde{\theta})$ (large $\rho$)};
+    % Draw elastic force applied to the central variable.
+    \draw[->] (2.45, 1.8) -- (3.6, 1.8) node[midway, above] {\small $\eta\rho(\theta_w - \tilde{\theta})$};
   \end{tikzpicture}
-  \caption{EASGD Caption here}
+  \caption{In this example we would like to make the intuition behind Elastic Averaging SGD clear by describing it as a classical physics problem. In this particular figure we have 1 worker, $\theta_w$ ($n = 1$, $\lambda = 1$), and a central variable $\tilde{\theta}$. The $y$-axis represents the error with respect to a certain parameterization $\theta$. Using Algorithm~\ref{algo:easgd_worker}, the worker performs $\lambda$ steps to compute the next value of $\theta_w$ using Equation~\ref{eq:easgd_sync_worker}. As stated before in Section~\ref{sec:easgd}, Equation~\ref{eq:easgd_sync_worker} holds 2 components, i.e., the regular negated first-order gradient ($-\eta_t \nabla_\theta \mathcal{L}_w$), and the \emph{negated} elastic difference ($-\eta_t\rho(\theta_w - \tilde{\theta})$). As always, the negated first-order gradient represents the steepest slope with respect to the current error (loss), and parameterization. However, the \emph{negated} elastic difference actually points towards the central variable. The magnitude of the elastic difference is controlled by hyperparameter $\rho$. This implies that a large value of $\rho$ \emph{strongly} limits the amount of exploration a worker can perform with respect to the central variable since the magnitude of the elastic difference vector will be proportionally larger compared to a small $\rho$. Finally, the central variable is updated using Equation~\ref{eq:easgd_sync_ps} and the elastic difference coming from all workers. Furthermore, we would like to note that the elastic difference during the central variable update is \emph{not} negated. Meaning that the central variable is optimized with respect to the ``pull'' of all workers, with the effect that workers whichare ahead in the optimization process, will have a larger elastic force, causing the central variable to be influenced more strongly by distant workers. Nevertheless, at the same time, distant workers are pulled towards the central variable using an equal but opposite force \emph{and} the negated gradient, i.e., the net force of the elastic difference and the negated gradient combined results either in a step towards a minimum, a null-operation, or a step in the direction of the central variable.}
 \end{figure}
+
+\begin{algorithm}[H]
+  \caption{Worker procedure of synchronous \textsc{easgd}. This algorithms accepts several hyperparameters, the first being the number of local computations $\lambda$, the exploration hyperparameter $\rho$, and the dynamic learning rate $\eta_t$.}
+  \label{algo:easgd_worker}
+  \begin{algorithmic}[1]
+    \Procedure{EASGDWorker}{$k$}
+    \State $\theta^k_0 \gets \tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $i \gets 0$
+    \For{$i < \lambda$}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $\theta^k_{t + 1} \gets \theta^k_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$ \Comment{Optimization step, could be \cite{kingma2014adam}, or other optimizer.}
+    \State $i \gets i + 1$
+    \State $t \gets t + 1$
+    \EndFor
+    \State $\mathcal{E} = \eta_t\rho(\theta^k_t - \tilde{\theta})$
+    \State $\theta^k_{t+1} = \theta^k_t - \mathcal{E}$
+    \State $\Call{Commit}{\mathcal{E}}$
+    \State $\Call{WaitForOtherWorkers()}{}$
+    \State $\tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets t + 1$
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
 
 \section{Asynchronous Data Parallelism}
 \label{sec:asynchronous_data_parallelism}
