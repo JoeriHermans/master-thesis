@@ -272,6 +272,7 @@ Assuming $\lambda = 1$, the worker update and central variable update are descri
     \draw[->] (2.45, 1.8) -- (3.6, 1.8) node[midway, above] {\small $\eta\rho(\theta_w - \tilde{\theta})$};
   \end{tikzpicture}
   \caption{In this example we would like to make the intuition behind Elastic Averaging SGD clear by describing it as a classical physics problem. In this particular figure we have 1 worker, $\theta_w$ ($n = 1$, $\lambda = 1$), and a central variable $\tilde{\theta}$. The $y$-axis represents the error with respect to a certain parameterization $\theta$. Using Algorithm~\ref{algo:easgd_worker}, the worker performs $\lambda$ steps to compute the next value of $\theta_w$ using Equation~\ref{eq:easgd_sync_worker}. As stated before in Section~\ref{sec:easgd}, Equation~\ref{eq:easgd_sync_worker} holds 2 components, i.e., the regular negated first-order gradient ($-\eta_t \nabla_\theta \mathcal{L}_w$), and the \emph{negated} elastic difference ($-\eta_t\rho(\theta_w - \tilde{\theta})$). As always, the negated first-order gradient represents the steepest slope with respect to the current error (loss), and parameterization. However, the \emph{negated} elastic difference actually points towards the central variable. The magnitude of the elastic difference is controlled by hyperparameter $\rho$. This implies that a large value of $\rho$ \emph{strongly} limits the amount of exploration a worker can perform with respect to the central variable since the magnitude of the elastic difference vector will be proportionally larger compared to a small $\rho$. Finally, the central variable is updated using Equation~\ref{eq:easgd_sync_ps} and the elastic difference coming from all workers. Furthermore, we would like to note that the elastic difference during the central variable update is \emph{not} negated. Meaning that the central variable is optimized with respect to the ``pull'' of all workers, with the effect that workers whichare ahead in the optimization process, will have a larger elastic force, causing the central variable to be influenced more strongly by distant workers. Nevertheless, at the same time, distant workers are pulled towards the central variable using an equal but opposite force \emph{and} the negated gradient, i.e., the net force of the elastic difference and the negated gradient combined results either in a step towards a minimum, a null-operation, or a step in the direction of the central variable.}
+  \label{fig:easgd_sync}
 \end{figure}
 
 \begin{algorithm}[H]
@@ -299,6 +300,31 @@ Assuming $\lambda = 1$, the worker update and central variable update are descri
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
+
+However, there is an interesting property about the elastic difference which is rather problematic for the communication frequency $\lambda$. Using the intuition from Figure~\ref{fig:easgd_sync}, we can deduce that Equation~\ref{eq:easgd_sync_worker} has an additional solution for 0 besides when $\nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) = 0$. This solution has profound implications on $\lambda$, and as a result, on the allocated computing resources. Because if this situation occurs, then all additional computations are wasted. Since during that time, the central variable is not updated, and the worker are not updated. In order to describe this formally, let us consider the cases for which the \textsc{easgd} worker update rule is 0, as shown in Equation~\ref{eq:easgd_sync_equilibrium_0}.
+
+\begin{equation}
+  \label{eq:easgd_sync_equilibrium_0}
+  -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) - \eta_t\rho(\theta^k_t - \tilde{\theta}_t) = 0
+\end{equation}
+
+Since we know that when a worker evaluates a 0-gradient, i.e., $\nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) = 0$, then the \textsc{easgd} worker update rule is also 0. Since no change in the parameterization of the worker took place, and as a result, there is no change in the value of the elastic difference. Unless $\lambda > 1$, and in step $t - 1$, $\nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) \neq 0$. In this case, a net force will be applied in the direction of the central variable, that is, the worker will move back towards the central variable.\\
+
+Nevertheless, let us focus our efforts on the case when Equation~\ref{eq:easgd_sync_equilibrium_0} is satisfied. First, let us assume that $\nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) \neq 0$. As a result, the only way that the condition described in Equation~\ref{eq:easgd_sync_equilibrium_0} can be satisfied is when the \emph{non-negated} elastic difference equals the gradient update as shown in Equation~\ref{eq:easgd_sync_equilibrium}.
+
+\begin{equation}
+  \label{eq:easgd_sync_equilibrium}
+  -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) = \eta_t\rho(\theta^k_t - \tilde{\theta}_t)
+\end{equation}
+
+Using Equation~\ref{eq:easgd_sync_equilibrium}, we can derrive a condition, described in Equation~\ref{eq:easgd_sync_working_condition}, where the amount of computational work is not wasted, and introduce an early-stopping mechanism to prevent such waste.
+
+\begin{equation}
+  \label{eq:easgd_sync_working_condition}
+  -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) > \eta_t\rho(\theta^k_t - \tilde{\theta}_t)
+\end{equation}
+
+One might ask why the elastic difference in Equation~\ref{eq:easgd_sync_working_condition} needs to be smaller than the gradient?
 
 \section{Asynchronous Data Parallelism}
 \label{sec:asynchronous_data_parallelism}
