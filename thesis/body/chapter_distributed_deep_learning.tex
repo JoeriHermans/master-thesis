@@ -321,10 +321,136 @@ Using Equation~\ref{eq:easgd_sync_equilibrium}, we can derrive a condition, desc
 
 \begin{equation}
   \label{eq:easgd_sync_working_condition}
-  -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) > \eta_t\rho(\theta^k_t - \tilde{\theta}_t)
+  \norm{-\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t)} > \norm{\eta_t\rho(\theta^k_t - \tilde{\theta}_t)}
 \end{equation}
 
-One might ask why the elastic difference in Equation~\ref{eq:easgd_sync_working_condition} needs to be smaller than the gradient?
+One might ask why the elastic difference in Equation~\ref{eq:easgd_sync_working_condition} needs to be smaller than the gradient term in order for the worker to move towards a minima? Remember from Figure~\ref{fig:easgd_sync} that the worker only moves (backwards or forwards) whenever Equation~\ref{eq:easgd_sync_equilibrium_0} is not satisfied. As a result, we can deduce that a worker only moves towards a minima when Equation~\ref{eq:easgd_sync_working_condition} is met until the \emph{equilibrium} condition in Equation~\ref{eq:easgd_sync_equilibrium} is satisfied. At this point, a worker could stop any further local computations since additional computations would be wasted anyway. Of course, assuming the mini-batch size $m$ is sufficiently large to eradicate any noise originating from the gradients. In order to proof this result emperically, we conducted several experiments with ordinary hyperparameters ($\lambda = 30$, $\eta = 0.00001$, $n = 5$) for different values of $\rho$ summarized in Figure~\ref{fig:easgd_sync_equilibrium} and Figure~\ref{fig:easgd_sync_equilibrium_small_rho}. What we observe in both cases is that the workers initially perform a large amount of exploration due to the relatively large value of $\lambda$. Since $\lambda$ has a large value, the workers do not often synchronize with the central variable causing them to reach the equilibrium condition described in Equation~\ref{eq:easgd_sync_equilibrium} because the gradients are nog large enough to satisfy Equation~\ref{eq:easgd_sync_working_condition}.\\
+
+To summarize, if the gradients produced by the workers are not large enough to produce a net force in the direction of a minima, then the workers are in an equilibrium with the elastic difference causing additional computational work to be wasted since the elastic difference will only lower if the distance between the worker and the central variable gets smaller. An obvious solution to this problem would be to lower the value of $\lambda$ or $\rho$. However, lowering the value of $\lambda$ causes the worker to communicate more frequently with the parameter server, even if the equilibrium condition is not met. Since \textsc{easgd} is designed with communication constraints in mind, this is not an ideal solution. Furthermore, lowering $\rho$ is also not ideal since this would reduce the equilibrium condition even further, causing workers to deviate further from the central variable. As mentioned before in Section~\ref{sec:model_averaging} this is not desired because the possibility exists that different sets of workers will fall into different minima. This is especially problematic in \textsc{easgd} since the parameterizations of the workers are not synchronized with the central variable, but are coordinated using the elastic difference. For example, imagine the case when two sets of workers (equal in number) are in two different minima with the central variable being in the middle of these two sets. Furthermore, assume that the elastic difference in these two sets of workers is identical and Equation~\ref{eq:easgd_sync_equilibrium} is satisfied. This implies that the central variable and the workers are not able to move, even after a synchronization step, which in turn results in the fact that the central variable is not able to converge.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_space.png}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_equilibrium.png}
+  \end{subfigure}
+  \caption{In this experiment we use $\rho = 5$, as suggested by the authors~\cite{zhang2015deep}. We observe that at some point the elastic difference is starting to the influence the first-order gradients causing the workers to bend downwards, which is not present in Figure~\ref{fig:easgd_sync_equilibrium_small_rho}. This ``bend'' is due to a significant elastic force pointing in the direction of the central variable. If we would decompose the vector in its main components, i.e., $\theta_1$ and $\theta_2$, we would find that the $\theta_2$ component is significant enough to cause to worker to bend downwards since the elastic force is getting stronger proportional to the distance between the worker and the central variable and hyperparameter $\rho$. Furthermore, the equilibrium plot shows that the worker does a lot of initial exploration, while the central variable slowly follows the workers based on the averaged elastic difference. After 40000 steps, we see that the workers reach the equilibrium condition. As a result, any computational work done by the workers within a communication window is wasted since the distance between the workers and the central variable needs to grow smaller for the elastic force to shrink. However, because the elastic force is shrinking proportionally to the distance between the workers and the central variable, it allows the workers to explore \emph{slightly} more of the hypothesis space since the workers already met the equilibrium condition.}
+  \label{fig:easgd_sync_equilibrium}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_space_2.png}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_equilibrium_2.png}
+  \end{subfigure}
+  \caption{In this experiment we reduce the value of the exploration hyperparameter $\rho$ while all other hyperparameters from our experiment in Figure~\ref{fig:easgd_sync_equilibrium} remain the same. After running the experiment we do not observe the ``bend'' which we initially observed in Figure~\ref{fig:easgd_sync_equilibrium}. However, this was expected since the elastic force is not that prominent due to the reduced value of hyperparameter $\rho$. Nevertheless, we still observe that the workers reach the equilibrium condition, with the difference that the central variable shows slower convergence behavior compared to Figure~\ref{fig:easgd_sync_equilibrium}.}
+  \label{fig:easgd_sync_equilibrium_small_rho}
+\end{figure}
+
+To improve convergence of the central variable in \textsc{easgd}, and reduce the amount of wasted computational resources, we implemented Equation~\ref{eq:easgd_equilibrium_stopping_condition} based on Equation~\ref{eq:easgd_sync_working_condition} as a measure to stop wasting further computations.
+
+\begin{equation}
+  \label{eq:easgd_equilibrium_stopping_condition}
+  \norm{-\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t)} \leq \norm{\eta_t\rho(\theta^k_t - \tilde{\theta}_t)}
+\end{equation}
+
+However, we observed from our experiments that this exact condition is rarely satisfied. Of course, we made the assumption in Equation~\ref{eq:easgd_sync_equilibrium} that the parameterization of a worker does \emph{not} change if a worker settles in an equilibrium. Of course, before reaching the equilibrium, the gradient is non-zero, this implies that there is a change in the parameterization of a worker causing the elastic difference to be modified. With the result that the net force applied to the worker is \emph{approaching} the equilibrium. As a result, the net force applied to a worker is gradually becoming smaller.\\
+
+In order to anticipate for a declining net force, and as a result, the gradually approaching equilibrium, we communicate the elastic difference with the parameter server if Equation~\ref{eq:easgd_equilibrium_fix} is met.
+
+\begin{equation}
+  \label{eq:easgd_equilibrium_fix}
+  \Bigg(\norm{-\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t)} - \norm{\eta_t\rho(\theta^k_t - \tilde{\theta}_t)}\Bigg) < \eta_t
+\end{equation}
+
+Using the same experimental configuration as in Figure~\ref{fig:easgd_sync_equilibrium}, with the difference that Equation~\ref{eq:easgd_equilibrium_fix} has been implemented as an early-stopping mechanism to communicate the elastic difference with the parameter server. Using Equation~\ref{eq:easgd_equilibrium_fix}, we can see that the proposed early stopping mechanism benefits the central variable in terms of convergence with respect to the default experimental configuration in Figure~\ref{fig:easgd_sync_equilibrium}.\\
+
+What is remarkable about the equilibrium plot in Figure~\ref{fig:easgd_sync_fix} is the precense of a sudden drop in the norm of the elastic difference vector which is abscent in Figure~\ref{fig:easgd_sync_equilibrium} despite the fact that the workers follow similar paths. This is due to the early stopping mechanism which pulling the central variable closer towards the workers causing the decline in the norm of the elastic difference. Furthermore, since at this point the gradients are relatively small, a lot of local work can be done while at the same time the central variable will be able to keep the elastic distance small.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_space_fix.png}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_ed_fix.png}
+  \end{subfigure}
+  \caption{\textsc{easgd} using the early stopping mechanism described in Equation~\ref{eq:easgd_equilibrium_fix}. Compared to Figure~\ref{fig:easgd_sync_equilibrium}, which uses the same experimental configuration, we observe that the central variable benefits in terms of convergence from increased communication when the early stopping condition is met.}
+  \label{fig:easgd_sync_fix}
+\end{figure}
+
+Since the early stopping condition effectively communicates the elastic difference with the parameter server, is it not in essence increasing the communication frequency, i.e., lowering $\lambda$? In effect it isn't, since communication only takes place when the workers and the central variable approach an equilibrium condition. To show this, we conducted several experiments with and without the early stopping mechanism shown in Figure~\ref{fig:easgd_sync_lambda_10} and Figure~\ref{fig:easgd_sync_lambda_50}.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_10_n}
+    \caption{No early stopping}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_10_y}
+    \caption{Early stopping}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_10_n_eq}
+    \caption{Equilibrium condition is not met (lines do not meet). As a result, early stopping is not applied.}
+  \end{subfigure}
+  \caption{$\lambda = 10$}
+  \label{fig:easgd_sync_lambda_10}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_50_n}
+    \caption{No early stopping}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_50_y}
+    \caption{Early stopping}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_50_y_eq}
+    \caption{Equilibrium condition is met. Early stopping is applied.}
+  \end{subfigure}
+  \caption{$\lambda = 50$}
+  \label{fig:easgd_sync_lambda_50}
+\end{figure}
+
+An other interesting phenomena is when \textsc{easgd} is approaching a minima. Compared to other synchronous optimizers such as mini-batch parallelism, or model averaging, \textsc{easgd} requires a significant amount of additional steps to actually converge to the minima because of the equilibrium condition as shown in Figure~\ref{fig:easgd_sync_slow}. Remember, if the workers are approaching the equilibrium condition, a small net force is applied to the worker because the \emph{negated} elastic difference counter-acts the advances of the workers to minimize the variance of the workers with respect to the central variable.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_slow_space}
+    \caption{a}
+  \end{subfigure}
+  \begin{subfigure}{.45\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_slow_eq}
+    \caption{b}
+  \end{subfigure}
+  \caption{Slow converge of \textsc{easgd} at minima due to the equilibrium condition. In this figure we apply early stopping but due to the small gradients close to the minima it does not have any significant effects.}
+  \label{fig:easgd_sync_slow}
+\end{figure}
 
 \section{Asynchronous Data Parallelism}
 \label{sec:asynchronous_data_parallelism}
