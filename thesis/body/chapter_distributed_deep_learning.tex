@@ -456,11 +456,88 @@ An other interesting phenomena is when \textsc{easgd} is approaching a minima. C
 \subsection{DOWNPOUR}
 \label{sec:downpour}
 
+Waits induced by blocking mechanisms in synchronous data parallelism significantly reduce the harware utilisation during training, especially in non-homogeneous hardware configurations. As mentioned in Section~\ref{sec:ddl_introduction}, this can be resolved by simply removing the synchronizations barriers, as suggested by~\cite{dean2012large}. The algorithm the authors proposed is called \textsc{downpour}, and is shown in Algorithm~\ref{algo:downpour_worker}.\\
+
+\textsc{downpour} is an intuitively a very simple algorithm. As before, we have $n$ different workers optimizing a central variable $\tilde{\theta}_t$ with the difference that every worker will \emph{commit} a gradient after every mini-batch in an asynchronous fashion, and after a commit has been performed, the worker will synchronize with the parameter server by \emph{pulling} the most recent parameterization of the central variable.
+
+\begin{equation}
+  \label{eq:downpour_worker}
+  \theta^k_{t+1} = \theta^k_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k)
+\end{equation}
+
+\begin{equation}
+  \label{eq:downpour_ps}
+  \tilde{\theta}_{t+1} = \tilde{\theta}_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k)
+\end{equation}
+
+As mentioned in Chapter~\ref{chapter:introduction}, due to the asynchronous optimization one does not have the issue with idle workers due to synchronizations mechanisms. Instead, there is a more severe problem related to the parameterizations of the workers. Since workers will commit gradients to the central variable in an asynchronous manner, other workers will commit gradients based on older parameterizations of the central variable. As a result, the gradients of these workers are \emph{stale} as shown in Figure~\ref{fig:intro_asyn_data_parallelism}. An additional, but related issue to parameter staleness, is that increasing the amount of asynchronous workers, increases the staleness in the system as shown in Figure~\ref{fig:staleness_distribution}.
+
+\begin{algorithm}[H]
+  \caption{Worker procedure of \textsc{downpour}, which is a parallelized extension of \textsc{sgd}.}
+  \label{algo:downpour_worker}
+  \begin{algorithmic}[1]
+    \Procedure{DOWNPOURWorker}{$k$}
+    \State $\theta^k_0 \gets \tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $g \gets -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
+    \State $\Call{Commit}{g}$
+    \State $\theta^k_{t + 1} \gets \Call{Pull}$
+    \State $t \gets t + 1$
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+Nevertheless, contrary to \textsc{easgd}, \textsc{downpour} is not designed with communication constraints in mind. As a result, increasing the number of workers in an already saturated environment will not reduce the training time since whenever a worker computes a gradient, it will commit the result to the parameter server. To illustrate this, imagine having several workers committing highly dimensional gradients to the parameter server. Since it takes some time to incorperate these gradients into the central variable, other workers will have to wait for their turn in the queue. To reduce the side-effects (waits) in this particular situation,~\cite{louppe2010zealous} proposes to before committing the gradient, a worker should send a small control message to check if the queue is currently occupied, i.e., gradients of other workers are being incorperated into the central variable. If this is the case, do not commit the gradient, but fetch the next mini-batch, compute the gradient, and accumulate the computed gradient with the previously computed gradient, and send a new control message. An obvious problem with this method is that the possibility exists that after $x$ number of retries, the central variable queue is still occupied by other workers. Following the naive procedure, the zealous method should keep accumulating new gradients. However, this is problematic at step $x + 1$, when the queue is available. Imagine the possibility that other workers, and the central variable converged to a different minima. If our worker would commit the accumulated gradient in this particular situation, then the central variable would not be close to its minima as it was before. In order to reduce the amount of staleness in such a situation, one could introduce a limit to the amount of local steps that can be made in an attempt to reduce staleness as shown in Algorithm~\ref{algo:downpour_worker_zealous}.\\
+
+However, this technique introduces an additional hyperparameter. Several other approaches which handle this problem in a different way without introducing new hyperparameters, and additionally giving some intuition and insight into parameter staleness in Deep Learning are discussed in detail in Chapter~\ref{chapter:accumulated_gradient_normalization} and Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}.
+
+\begin{algorithm}[H]
+  \caption{Zealous worker procedure of \textsc{downpour}, inspired by~\cite{louppe2010zealous}.}
+  \label{algo:downpour_worker_zealous}
+  \begin{algorithmic}[1]
+    \Procedure{ZealousDOWNPOURWorker}{$k$}
+    \State $\theta^k_0 \gets \tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $i \gets 0$
+    \State $g \gets 0$
+    \While{$i < \lambda$}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $g \gets g -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
+    \If{$\textbf{not}$~\Call{QueueOccupied}~}
+    \State $\Call{Commit}{g}$
+    \State $\theta^k_{t + 1} \gets \Call{Pull}$
+    \EndIf
+    \State $t \gets t + 1$
+    \State $i \gets i + 1$
+    \EndWhile
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/downpour_10}
+    \caption{$n = 10$}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/downpour_20}
+    \caption{$n = 20$}
+  \end{subfigure}
+  \caption{Divergence due to number ($n = 20$) of asynchronous workers in the optimization process~\cite{implicitmomentum} and not dealing with parameter staleness in a more intelligent way. Lowering the number workers ($n = 10$) causes the central variable to converge.}
+  \label{fig:easgd_sync_slow}
+\end{figure}
+
+
 \subsection{Dynamic SGD}
 \label{sec:dyn_sgd}
-
-\subsection{Asychrony Induced Momentum}
-\label{sec:implicit_momentum}
 
 \subsection{Asynchronous Elastic Averaging SGD}
 \label{sec:aeasgd}
