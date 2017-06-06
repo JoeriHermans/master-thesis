@@ -541,12 +541,73 @@ However, this technique introduces an additional hyperparameter. Several other a
 \subsection{Dynamic SGD}
 \label{sec:dyn_sgd}
 
-The intrinsic reason that asynchronous methods like \textsc{downpour} cannot guarentee convergence is that these method directly incorperate local updates (good) and stale updates (bad) in the central variable~\cite{jiang2017heterogeneity}. To combat this, one could incorperate staleness information of a worker to have a per-worker learning which decays potentionally stale gradients proportional to the staleness~\cite{jiang2017heterogeneity} as shown in Equation~\ref{eq:dynsgd_ps}.
+The intrinsic reason that asynchronous methods like \textsc{downpour} cannot guarentee convergence is that these method directly incorperate local updates (good) and stale updates (bad) in the central variable~\cite{jiang2017heterogeneity}. To combat this, one could incorperate staleness information of a worker to have a per-worker learning which decays protentionally stale gradients proportional to the staleness~\cite{jiang2017heterogeneity}. As a result, Equation~\ref{eq:dynsgd_ps} will better cope with parameter staleness in contrast to \textsc{downpour}.
 
 \begin{equation}
   \label{eq:dynsgd_ps}
   \tilde{\theta}_{t+1} = \tilde{\theta}_t - \frac{1}{\tau_i} \odot \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t)
 \end{equation}
+
+However, we would like to note that in a homogeneous hardware configuration the gradients will be scaled down proportional to the number of asynchronous workers as $\mathbf{E}[\tau] = (n - 1)$~\cite{implicitmomentum}. As a result, the expected scalar that will be applied to a worker gradient in a homogeneous setting is summarized in Equation~\ref{eq:dynsgd_homogeneous}.
+
+\begin{equation}
+  \label{eq:dynsgd_homogeneous}
+  \mathbf{E}\Bigg[\frac{1}{\tau}\Bigg] = \Bigg(\frac{1}{n - 1}\Bigg)
+\end{equation}
+
+Furthermore, as we will see in Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}, this technique scales down gradients with respect to the number of stale steps, while the issue of staleness mainly arrises from the \emph{distance between parameterizations}. For example, imagine a plateau where the workers have to pass through in order to converge to a minima. Since progress is slow in a plateau, thus the distance between the workers and the central variable will remain relatively small, it is non-sensical to scale down the gradients with respect to the number of stale steps, since these gradients provide good information because they are \emph{close to the ``old'' central variable}.\\
+
+Nevertheless, in order to capture the staleness information, some additional engineering is required to keep track of worker staleness since the worker themselves to not possess this information. Contrary to~\cite{jiang2017heterogeneity}, we propose a different architecture to capture the staleness information. In our approach we exchange messages between the parameters server and workers. These messages can obtain additional information beside the parameterization of a worker or the central variable. During the initialization phase of the training procedure, we keep track of a \emph{parameter server clock}. Basically, this clock holds the number of updates that have been applied to the parameter server. Furthermore, in order to obtain the staleness of every worker, and apply the scaling factor described in Equation~\ref{eq:dynsgd_ps}, the parameter server needs to keep track of the last \emph{clock tick} when a worker $i$ sent the last update. It does so by maintaining a hashmap, or a different datastructure, to associate the last update clock tick with a particular worker. Furthermore, we scale the parameterizations on the parameter server since this will ensure the consistency of the staleness information because it is possible that an other worker might commit an update in the meantime (CAP theorem). Nevertheless, for (very) large networks there might be an issue when insufficient processing power is allocated to preprocess the queue in an efficient manner.
+
+\begin{algorithm}[H]
+  \caption{Zealous worker procedure of \textsc{downpour}, inspired by~\cite{louppe2010zealous}.}
+  \label{algo:dynsgd_worker}
+  \begin{algorithmic}[1]
+    \Procedure{DynSGDWorker}{$k$}
+    \State $\theta^k_0 \gets \tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $i \gets 0$
+    \State $g \gets 0$
+    \While{$i < \lambda$}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $g \gets g -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
+    \If{$\textbf{not}$~\Call{QueueOccupied}~~$\textbf{or}$~$i = (\lambda -1)$}
+    \State $\Call{Commit}{g}$
+    \State $\theta^k_{t + 1} \gets \Call{Pull}$
+    \EndIf
+    \State $t \gets t + 1$
+    \State $i \gets i + 1$
+    \EndWhile
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+  \caption{Zealous worker procedure of \textsc{downpour}, inspired by~\cite{louppe2010zealous}.}
+  \label{algo:dynsgd_paramter_server}
+  \begin{algorithmic}[1]
+    \Procedure{DynSGDParameterServer}{$k$}
+    \State $\theta^k_0 \gets \tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $i \gets 0$
+    \State $g \gets 0$
+    \While{$i < \lambda$}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $g \gets g -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
+    \If{$\textbf{not}$~\Call{QueueOccupied}~~$\textbf{or}$~$i = (\lambda -1)$}
+    \State $\Call{Commit}{g}$
+    \State $\theta^k_{t + 1} \gets \Call{Pull}$
+    \EndIf
+    \State $t \gets t + 1$
+    \State $i \gets i + 1$
+    \EndWhile
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
 
 \subsection{Asynchronous Elastic Averaging SGD}
 \label{sec:aeasgd}
