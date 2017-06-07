@@ -641,6 +641,92 @@ To validate the claims made by~\cite{jiang2017heterogeneity}, we conducted sever
 \subsection{Asynchronous Elastic Averaging SGD}
 \label{sec:aeasgd}
 
+In Section~\ref{sec:easgd} we discussed the synchronous version of \textsc{easgd}. To reduce the effect of blocking mechanisms, which is profound in synchronous data parallelism, the authors proposed~\cite{zhang2015deep} an asynchronous extension of \textsc{easgd} which is called \textsc{aeasgd}, or Asynchronous Elastic Averaging SGD. In essence, nothing changed for the worker procedure shown in Equation~\ref{eq:aeasgd_worker} with the exception of the blocking mechanism. However, contrary to other optimization algorithms discussed in this chapter (which commit first-order gradients), \textsc{aeasgd} is optimizing the central variable by incorperating the elastic differences of the workers in an asynchronous fashion, as shown in Equation~\ref{eq:aeasgd_ps} (for intuition, see Figure~\ref{fig:easgd_sync}).
+
+\begin{equation}
+  \label{eq:aeasgd_worker}
+  \theta^k_{t+1} = \theta^k_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\mathbf{x}^k_t;\mathbf{y}^k_t) - \eta_t\rho(\theta^k_t - \tilde{\theta}_t)
+\end{equation}
+
+\begin{equation}
+  \label{eq:aeasgd_ps}
+  \tilde{\theta}_{t+1} = \tilde{\theta}_t + \eta_t\rho(\theta^k_t - \tilde{\theta}_t)
+\end{equation}
+
+Since \textsc{easgd} and its variants are designed with communication constraints in mind, and allow for more exploration of the local hypothesis space~\cite{zhang2015deep}, we can significantly reduce the communication frequency, and thus further reducing the training time. However, as in any asynchronous optimizer, \textsc{aeasgd} mitigates staleness by pulling the most recent central variable in order to compute a more up-to-date elastic difference as shown in Algorithm~\ref{algo:easgd_worker}.
+
+\begin{algorithm}[H]
+  \caption{Worker procedure of \textsc{aeasgd}. Note how the pull of the central variable occurs \emph{before} the computation of the elastic difference.}
+  \label{algo:aeasgd_worker}
+  \begin{algorithmic}[1]
+    \Procedure{AEASGDWorker}{$k$}
+    \State $\theta^k_0 \gets \tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $i \gets 0$
+    \For{$i < \lambda$}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $\theta^k_{t + 1} \gets \theta^k_t - \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
+    \State $i \gets i + 1$
+    \State $t \gets t + 1$
+    \EndFor
+    \State $\tilde{\theta} \gets \Call{Pull}$
+    \State $\mathcal{E} = \eta_t\rho(\theta^k_t - \tilde{\theta})$
+    \State $\theta^k_{t+1} = \theta^k_t - \mathcal{E}$
+    \State $\Call{Commit}{\mathcal{E}}$
+    \State $t \gets t + 1$
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+What is interesting about \textsc{aeasgd} in our experiments, is that given identical hyperparameterizations as other optimizers in this chapter \textsc{aeasgd} is not able to get closer to a minima as can be seen in Figure~\ref{fig:aeasgd_training}. This could potentially be due to the equilibrium condition described in Section~\ref{sec:easgd}. Nevertheless, the claim the authors make that \textsc{easgd} benifits from more exploration is validated in Figure~\ref{fig:aeasgd_training} as well. Furthermore, during our experiments we have encountered several interesting observations on \textsc{aeasgd}. The first being when a high communication frequency is used, i.e., $\lambda = 1$, \textsc{aeasgd} shows sign of \emph{divergence}. However, this effect is not always present, and our suspecions are that numerical error might be the root cause of this issue. In order to better understand the properties of the divergence in \textsc{aeasgd}, we conducted several simulations which show similar behaviour. To this date, we do not really have an idea why this is exactly happening, and is subject to further investigation. Furthermore, we would like to declare the following observations, as a result of these simulations:
+
+\begin{itemize}
+\item Asynchronous optimizers which commit gradients: central variable is ``pushed'' by workers towards a minima.
+\item \textsc{easgd}: central variable is ``pulled'' by the workers towards a minima as described in Section~\ref{sec:easgd}.
+\item \textsc{aeasgd}: central variable acts as a ``mean'' of a distribution of workers, where the variance of the workers is controlled by $\rho$.
+\end{itemize}
+
+The final remarkable observation, shown in Figure~\ref{fig:aeasgd_validation}, was that in almost all tests, the validation accuracy of the optimizer was consistently better than the training accuracy. According to us, this is because of the observation mentioned above, i.e., because \textsc{aeasgd} behaves like a moving distribution (more like a particle filter), it will tend to find a flat minima which generalizes better than the training accuracy of the central variable. However, this is pure speculation and is subject to further research.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{resources/images/aeasgd_15}
+    \caption{$\lambda = 15$}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{resources/images/aeasgd_30}
+    \caption{$\lambda = 30$}
+  \end{subfigure}
+  \caption{Accuracy plots which show the training accuracy of the central variable for different communication frequencies. These results validate the claims of the authors that in general, the central variable benefits from more exploration. However, we would argue that this is true only when sufficient amount of data is available. Furthermore, we would like to note that compared to other optimizers discussed in this Chapter, \textsc{easgd} seems to converge slowly close to a minima, this might be due to the equilibrium condition described in Section~\ref{sec:easgd}. However, further evidence is required to confirm this.}
+  \label{fig:aeasgd_training}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{resources/images/aeasgd_val_1}
+    \caption{$\lambda = 1$}
+  \end{subfigure}
+  \begin{subfigure}{.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{resources/images/aeasgd_val_15}
+    \caption{$\lambda = 15$}
+  \end{subfigure}
+  \begin{subfigure}{.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{resources/images/aeasgd_val_30}
+    \caption{$\lambda = 30$}
+  \end{subfigure}
+  \caption{Results of a small experiment to show the consistently higher validation accuracy compared to the training accuracy in \textsc{aeasgd} for different values of $\lambda$.}
+  \label{fig:aeasgd_validation}
+\end{figure}
+
 \section{Hybrids}
 \label{sec:hybrids}
 
@@ -648,6 +734,3 @@ To validate the claims made by~\cite{jiang2017heterogeneity}, we conducted sever
 \label{sec:stale_synchronous_optimizers}
 
 Other approaches to deal with staleness in asynchronous optimization have been suggested in the past years~\cite{cipar2013solving, ho2013more}. These approaches, typically called Stale Synchronous Optimizers, are based on the concept that staleness needs to be limited within a system. In order to limit the amount of staleness within a system, asynchronous workers can only be a certain number of steps ahead compared to the slowest worker. Hence the name stale synchronous optimizers, since they allow for a limited amount of staleness, and if this particular condition is not met by some workers, then these workers will have to wait until the slower workers caught up. However, as mentioned before, we know from~\cite{implicitmomentum} that the expected staleness in a homogeneous system is $\mathbf{E}(\tau) = (n - 1)$. As a result, adding more workers to the problem in stale synchronous optimizers is non-sensical, since adding more workers to the problem implicitly increases the amount of staleness. As a result, the limit which is specified will have to be changed whenever a couple of workers are added to the optimization process. For this reason, we will not consider stale synchronous optimizers in this thesis.
-
-\section{Summary}
-\label{sec:ddl_summary}
