@@ -560,9 +560,7 @@ Furthermore, as we will see in Chapter~\ref{chapter:asynchronous_distributed_ada
 
 Nevertheless, in order to capture the staleness information, some additional engineering is required to keep track of worker staleness since the worker themselves to not possess this information. Contrary to~\cite{jiang2017heterogeneity}, we propose a different architecture to capture the staleness information. In our approach we exchange messages between the parameters server and workers. These messages can obtain additional information beside the parameterization of a worker or the central variable. During the initialization phase of the training procedure, we keep track of a \emph{parameter server clock}. Basically, this clock holds the number of updates that have been applied to the central variable. Furthermore, in order to obtain the staleness of every worker, and apply the scaling factor described in Equation~\ref{eq:dynsgd_ps}, the parameter server needs to keep track of the last \emph{clock tick} when a worker $i$ sent an update. It does so by maintaining a hashmap, or a different datastructure, to associate the last update clock tick with a particular worker. Furthermore, we scale the parameterizations on the parameter server since this will ensure the consistency of the staleness information because it is possible that an other worker might commit an update in the meantime (CAP theorem), and reduce the amount of blocking mechanisms. Nevertheless, for (very) large networks there might be an issue when insufficient processing power is allocated to preprocess the queue in an efficient manner.\\
 
-An additional requirement of this architecture, is that the parameter server needs to update the worker datastructure whenever a worker \emph{pulls} the central variable (because the worker will compute a gradient based on the parameterization of the central variable it just pulled, and this is required to compute the number of updates that happened in between). Then, whenever a worker commits a gradient to the central variable, the paramter server just needs the compute the difference between the last recorded clock time of this particular worker and the current value of the parameter server clock. Where the last recorded clock tick of a particular worker can be retrieved from the data structure mentioned above. The complete pseudo-code for these procedures can be found in Algorithm~\ref{algo:dynsgd_worker} and Algorithm~\ref{algo:dynsgd_parameter_server}.
-
-\newpage
+An additional requirement of this architecture, is that the parameter server needs to update the worker datastructure whenever a worker \emph{pulls} the central variable (because the worker will compute a gradient based on the parameterization of the central variable it just pulled, and this is required to compute the number of updates that happened in between). Then, whenever a worker commits a gradient to the central variable, the paramter server just needs the compute the difference between the last recorded clock time of this particular worker and the current value of the parameter server clock. Where the last recorded clock tick of a particular worker can be retrieved from the data structure mentioned above. The complete pseudo-code for these procedures can be found in Algorithm~\ref{algo:dynsgd_worker} and Algorithm~\ref{algo:dynsgd_parameter_server}. However, an alternative approach which does not require an additonal data structure to be maintained by the parameter server, is to simply send the current clock tick together with the parameterization of the central variable to the worker during a \emph{pull}. Similar to our previous technique, the scaling will still happen at the side of the parameter server in order to preserve staleness consistency. However, when the worker commits a gradient to the parameter server, the parameter server does not have to do additional searches in the worker dictionary since the value of the parameter server clock at the time of the central variable pull is added to the commit message. As a result, the difference between the current clock value and the given clock value, thus the number of stale updates, can be derrived easily. However, this requires the worker procedure to be slightly modified whereas the worker procedure described in Algorithm~\ref{algo:dynsgd_worker} does not contain any modifications to extract staleness information.
 
 \begin{algorithm}[H]
   \caption{Worker procedure of \textsc{dynsgd}.}
@@ -573,17 +571,17 @@ An additional requirement of this architecture, is that the parameter server nee
     \State $t \gets 0$
     \While{$\textbf{not}$ converged}
     \State $i \gets 0$
-    \State $g \gets 0$
+    \State $a \gets 0$
     \While{$i < \lambda$}
     \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
-    \State $g \gets g -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
-    \If{$\textbf{not}$~\Call{QueueOccupied}~~$\textbf{or}$~$i = (\lambda -1)$}
-    \State $\Call{Commit}{g}$
-    \State $\theta^k_{t + 1} \gets \Call{Pull}$
-    \EndIf
+    \State $g \gets \eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
+    \State $a \gets a - g$
+    \State $\theta^k_{t+1} \gets \theta^k_t - g$
     \State $t \gets t + 1$
     \State $i \gets i + 1$
     \EndWhile
+    \State $\Call{Commit}{a}$
+    \State $\theta^k_{t + 1} \gets \Call{Pull}$
     \EndWhile
     \EndProcedure
   \end{algorithmic}
@@ -596,21 +594,60 @@ An additional requirement of this architecture, is that the parameter server nee
     \Procedure{DynSGDParameterServer}{}
     \State $\tilde{c} \gets 0$ \Comment{Parameter server clock}
     \State $\tilde{m} \gets \tilde{c}$ \Comment{Initialize staleness datastructure}
+    \State
     \Procedure{HandlePull}{$k$} \Comment{$k$ denotes the worker identifier}
     \State $\tilde{m}[k] = \tilde{c}$
     \State \Return $\tilde{\theta}_{\tilde{c}}$
     \EndProcedure
+    \State
     \Procedure{HandleCommit}{$k$, $\Delta\theta^k$}
     \State $\tau \gets \tilde{c} - \tilde{m}[k]$
     \State $\tilde{\theta}_{\tilde{c} + 1} = \tilde{\theta}_{\tilde{c}} + \frac{1}{\tau + 1} \odot \Delta\theta^k$  \Comment{$+1$ to prevent division by 0}
     \State $\tilde{c} \gets \tilde{c} + 1$
     \EndProcedure
+    \State
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
+
+\subsubsection{Experimental Validation of Dynamic SGD}
+\label{sec:dynsgd_validation}
+
+To validate the claims made by~\cite{jiang2017heterogeneity}, we conducted several experiments on the MNIST~\cite{mnist} dataset with different hyperparameterizations. Using an equivalent experimental configuration as with \textsc{downpour} in Section~\ref{sec:downpour}, and identical hyperparameterizations, we confirm that \textsc{dynsgd} is able to cope with with an increased amount of staleness due to asynchrony compared to \textsc{downpour} as shown in Figure~\ref{fig:dynsgd_downpour_fail}. Furthermore, due to the high communication frequency in Figure~\ref{fig:dynsgd_downpour_fail}, a significant amount of communication took place which reduced the throughput of the workers. To combat this, we decreased the communication frequency (thus increasing $\lambda$) which allows for more local work to be done before incorperating the \emph{accumulated gradient} into the central variable, as shown in Figure~\ref{fig:dynsgd_fair}. As expected, the training time was reduced significantly. However, due to the increased amount of local work, the gradients that were submitted to the parameter server became proportionally larger as well. Contrary to the expectations of the authors in~\cite{jiang2017heterogeneity}, \textsc{dynsgd} is not able to handle this amount of staleness. As a result, this is an indication that staleness is a more ``deeper'' problem, especially in the context of Deep Learning, which will be adressed in Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{resources/images/dynsgd_20}
+  \caption{In this experiment we applied 20 asynchronous workers on equally shared 5 epochs worth of MNIST training data. Since this is an identical experimental configuration for which \textsc{downpour} was used, this experiment verfies the claims of the authors that \textsc{dynsgd} is able to handle staleness better.}
+  \label{fig:dynsgd_downpour_fail}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/dynsgd_20_10}
+    \caption{5 epochs}
+  \end{subfigure}
+  \begin{subfigure}{0.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/dynsgd_20_10_fair}
+    \caption{40 epochs}
+  \end{subfigure}
+  \caption{Since network-communication is a blocking factor in terms of CPU usage, we decided to test several iterations of local exploration before committing the accumulated gradient to the parameter server. In our first experiment (a), we copied the experimental configuration from Figure~\ref{fig:dynsgd_downpour_fail}, with the difference that we decreased the communication frequency. Due to the decreased communication frequency, more local work was done, which had the result that the norm of the committed gradients to the parameter were larger. This had profound implications on convergence stability of the central variable, which only reached ~90\% training accuracy while using the same amount of data, but, spending less time. In order to have a ``fair'' comparison with Figure~\ref{fig:dynsgd_downpour_fail} in terms of training time, we increased the total amount of training data to 40 epochs, which resulted in a training accuracy of 99.7\%, compared to 98.1\% in Figure~\ref{fig:dynsgd_downpour_fail}.}
+  \label{fig:dynsgd_fair}
+\end{figure}
 
 \subsection{Asynchronous Elastic Averaging SGD}
 \label{sec:aeasgd}
 
 \section{Hybrids}
 \label{sec:hybrids}
+
+\subsection{Stale Synchronous Optimizers}
+\label{sec:stale_synchronous_optimizers}
+
+Other approaches to deal with staleness in asynchronous optimization have been suggested in the past years~\cite{cipar2013solving, ho2013more}.
+
+\section{Summary}
+\label{sec:ddl_summary}
