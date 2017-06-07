@@ -647,7 +647,7 @@ To validate the claims made by~\cite{jiang2017heterogeneity}, we conducted sever
 \subsection{Stale Synchronous Optimizers}
 \label{sec:stale_synchronous_optimizers}
 
-Other approaches to deal with staleness in asynchronous optimization have been suggested in the past years~\cite{cipar2013solving, ho2013more}.
+Other approaches to deal with staleness in asynchronous optimization have been suggested in the past years~\cite{cipar2013solving, ho2013more}. These approaches, typically called Stale Synchronous Optimizers, are based on the concept that staleness needs to be limited within a system. In order to limit the amount of staleness within a system, asynchronous workers can only be a certain number of steps ahead compared to the slowest worker. Hence the name stale synchronous optimizers, since they allow for a limited amount of staleness, and if this particular condition is not met by some workers, then these workers will have to wait until the slower workers caught up. However, as mentioned before, we know from~\cite{implicitmomentum} that the expected staleness in a homogeneous system is $\mathbf{E}(\tau) = (n - 1)$. As a result, adding more workers to the problem in stale synchronous optimizers is non-sensical, since adding more workers to the problem implicitly increases the amount of staleness. As a result, the limit which is specified will have to be changed whenever a couple of workers are added to the optimization process. For this reason, we will not consider stale synchronous optimizers in this thesis.
 
 \section{Summary}
 \label{sec:ddl_summary}
