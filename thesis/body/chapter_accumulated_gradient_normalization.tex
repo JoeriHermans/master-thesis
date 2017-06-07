@@ -10,6 +10,11 @@
 \chapter{Accumulated Gradient Normalization}
 \label{chapter:accumulated_gradient_normalization}
 
+This chapter will address the first contribution of this thesis, which is \emph{accumulated gradient normalization}, or \textsc{agn} in short. We start this chapter by introducing the concept and intuition behind accumulated gradient normalization. Next, we formalize \textsc{agn} and show how it should be implemented. Finally, we conduct several experiments to show the performance of \textsc{agn} with respect to other distributed optimizers.
+
+\section{Concept and intuition}
+\label{sec:agn_concept}
+
 \begin{equation}
   \label{eq:accumulated_gradient_normalization}
   \Delta\theta = -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;\textbf{x}_{ij};\textbf{y}_{ij})}{\lambda}
