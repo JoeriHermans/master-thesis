@@ -59,12 +59,47 @@ Now, imagine two asynchronous environments, in the first no gradient accumulatio
   \label{fig:downpour_accumulated_divergence}
 \end{figure}
 
-To reduce the magnitude of the accumulated gradients, and thereby reducing the amount of implicit momentum, while at the same time preserving the better direction that has been provided due to the amount of local exploration, we propose to normalize (average) the accumulated gradient with the amount of local steps that have been performed by the workers ($\lambda$), which is described in Equation~\ref{eq:accumulated_gradient_normalization} and is called \emph{Accumulated Gradient Normalization} or \textsc{agn}. An initial critique of this technique would be that by normalizing the accumulated gradient, \textsc{agn} would in effect be undoing the work that has been done by a single worker. This seems at first a valid criticism, however, one needs to take into account that \textsc{agn} is actually using the worker exploration steps to compute a better gradient based on first-order gradients.
+To reduce the magnitude of the accumulated gradients, and thereby reducing the amount of implicit momentum, while at the same time preserving the better direction that has been provided due to the amount of local exploration, we propose to normalize (average) the accumulated gradient with the amount of local steps that have been performed by the workers ($\lambda$), shown in Equation~\ref{eq:accumulated_gradient_normalization}\footnote{Note if $\lambda = 1$, \textsc{agn} is in essence equivalent to \textsc{downpour}.}. We call this technique of normalizing the accumulated gradient \emph{Accumulated Gradient Normalization} or \textsc{agn}. An initial critique of this technique would be that by normalizing the accumulated gradient, \textsc{agn} would in effect be undoing the work that has been done by a single worker. This seems at first a valid criticism, however, one needs to take into account that \textsc{agn} is actually using the worker exploration steps to compute a better gradient based on first-order gradients.
 
 \begin{equation}
   \label{eq:accumulated_gradient_normalization}
   \Delta\theta = -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;\textbf{x}_{ij};\textbf{y}_{ij})}{\lambda}
 \end{equation}
+
+Since \textsc{agn} is using local steps to compute a better gradient compared to first order gradients, it can also be used under communication constraints like \textsc{easgd} since less communication with the parameter server is required. In Figure~\ref{fig:agn_example}, we show how a \emph{Normalized Accumulated Gradient} is obtained and applied to the central variable using Equation~\ref{eq:accumulated_gradient_normalization} as described using Algorithm~\ref{algo:agn}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=.45\textwidth]{resources/images/agn_example}
+  \caption{After pulling the most recent parameterization of the central variable from the parameter server, the worker starts accumulating $\lambda$ first order gradients, and applies those gradients locally to explore the surrounding error space. Finally, after $\lambda$ exploration steps have been performed, the accumulated is normalized w.r.t. $\lambda$ and send to the parameter server.}
+  \label{fig:agn_example}
+\end{figure}
+
+\begin{algorithm}[H]
+  \caption{Worker procedure of \textsc{agn}.}
+  \label{algo:agn}
+  \begin{algorithmic}[1]
+    \Procedure{AGNWorker}{$k$}
+    \State $\theta^k_0 \gets \tilde{\theta} \gets \Call{Pull}$
+    \State $t \gets 0$
+    \While{$\textbf{not}$ converged}
+    \State $i \gets 0$
+    \State $a \gets 0$
+    \While{$i < \lambda$}
+    \State $\textbf{x},~\textbf{y} \gets \Call{FetchNextMiniBatch()}{}$
+    \State $g \gets -\eta_t \odot \nabla_\theta \mathcal{L}(\theta^k_t;\textbf{x};\textbf{y})$
+    \State $a \gets a + g$
+    \State $\theta^k_{t + 1} = \theta^k_t + g$
+    \State $i \gets i + 1$
+    \State $t \gets t + 1$
+    \EndWhile
+    \State $a \gets \frac{a}{\lambda}$ \Comment{Accumulated Gradient Normalization step.}
+    \State $\Call{Commit}{g}$
+    \State $\theta^k_{t + 1} \gets \Call{Pull}$
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
 
 \begin{equation}
   \lim_{\lambda \to \infty} -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;\textbf{x}_{ij};\textbf{y}_{ij})}{\lambda}
