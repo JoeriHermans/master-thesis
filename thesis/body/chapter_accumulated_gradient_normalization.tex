@@ -144,5 +144,16 @@ Nevertheless, the situation in \textsc{agn} is different as will become apparent
 \section{Experimental Validation}
 \label{sec:agn_experimental_validation}
 
+In this Section we evaluate \textsc{agn} against different distributed optimization algorithms. As before, MNIST~\cite{mnist} is used as a benchmark dataset, and all optimizers use the model described in Appendix~\ref{appendix:mnist_model} with identical parameterization of the weights. Furthermore, we will set the mini-batch size to $m = 128$ in all optimizers, and use \emph{40 epochs} worth of training data that will be equally distributed over all $n$ workers with the exception for \textsc{downpour}, which will only use 5 epochs, since \textsc{downpour} can not handle accumulated gradients. Our computing infrastructure consists a relatively small cluster of \emph{15 nodes} with a \emph{10Gbps interconnect}, most of them in the same rack, each having 2 Intel\textsuperscript{\textregistered} Xeon\textsuperscript{\textregistered} CPU E5-2650 v2 @ 2.60GHz CPU's, each having 8 cores and 2 threads. No GPU's are used during training, and no learning rate decay is applied.\\
+
+Our initial experiment, shown in Figure~\ref{fig:agn_experiment_1}, shows the training accuracy of \textsc{agn}, \textsc{aeasgd}, and \textsc{dynsgd} over time. In this experiment, we use a near-optimal hyperparameterization for all optimizers to ensure convergence. Furthermore, we also report the validation accuracy of every trained model applied to the validation set which is also provided by MNIST. This experiment shows a significant increase in training performance for \textsc{agn}, both in training accuracy, and a significant reduction in training time compared to current state-of-the-art algorithms such as \textsc{aeasgd} and \textsc{dynsgd}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=.6\textwidth]{resources/images/agn_experiment_1}
+  \caption{Test}
+  \label{fig:agn_experiment_1}
+\end{figure}
+
 \section{Theoretical Analysis}
 \label{sec:agn_theoretical_analysis}
