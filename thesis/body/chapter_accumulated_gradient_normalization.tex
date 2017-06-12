@@ -63,10 +63,10 @@ To reduce the magnitude of the accumulated gradients, and thereby reducing the a
 
 \begin{equation}
   \label{eq:accumulated_gradient_normalization}
-  \Delta\theta = -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;\textbf{x}_{ij};\textbf{y}_{ij})}{\lambda}
+  \Delta\theta = -\frac{1}{\lambda}\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})
 \end{equation}
 
-Since \textsc{agn} is using local steps to compute a better gradient compared to first order gradients, it can also be used under communication constraints like \textsc{easgd} since less communication with the parameter server is required. In Figure~\ref{fig:agn_example}, we show how a \emph{Normalized Accumulated Gradient} is obtained and applied to the central variable using Equation~\ref{eq:accumulated_gradient_normalization} as described using Algorithm~\ref{algo:agn}.
+Since \textsc{agn} is using local steps to compute a better gradient compared to first order gradients, it can also be used under communication constraints like \textsc{easgd} since less communication with the parameter server is required. In Figure~\ref{fig:agn_example}, we show how a \emph{Normalized Accumulated Gradient} is obtained and applied to the central variable using Equation~\ref{eq:accumulated_gradient_normalization} as described in Algorithm~\ref{algo:agn}.
 
 \begin{figure}[H]
   \centering
@@ -94,13 +94,20 @@ Since \textsc{agn} is using local steps to compute a better gradient compared to
     \State $t \gets t + 1$
     \EndWhile
     \State $a \gets \frac{a}{\lambda}$ \Comment{Accumulated Gradient Normalization step.}
-    \State $\Call{Commit}{g}$
-    \State $\theta^k_{t + 1} \gets \Call{Pull}$
+    \State $\Call{Commit}{a}$
+    \State $\theta^k_{t} \gets \Call{Pull}$
     \EndWhile
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
 
+An interesting thought experiment would be what would happen in the case that the workers would not communicate with the parameter server at all, that is, $\lambda = \infty$. How would the normalized accumulated gradients look like in such a situation, described by Equation~\ref{eq:agn_thought_experiment}?
+
 \begin{equation}
-  \lim_{\lambda \to \infty} -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;\textbf{x}_{ij};\textbf{y}_{ij})}{\lambda}
+  \label{eq:agn_thought_experiment}
+  \lim_{\lambda \to \infty} -\frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})}{\lambda}
 \end{equation}
+
+In order to completely understand how the worker deltas would look like after $\lambda = \infty$ steps, one first needs to understand the individual components of Equation~\ref{eq:agn_thought_experiment}. The most inner component, $\eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})$, is just the computation of a mini-batch using $m - 1$ samples, where index $i$ denotes the current step in the gradient accumulation. Please note that a mini-batch can differ for different values of $i$ as training samples are randomly retrieved from the dataset. After computing the gradient based on the mini-batch, the local model will be updated as $\theta_{i + 1} = \theta_i - \eta_t\frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})$. This process goes on for $\lambda$ steps, while at the end, the accumulated is normalized with respect to $\lambda$.\\
+
+Let us assume we have a convex error space, or a non-convex error space with at least a single minima. Due to the existance of a minima, first order gradients will eventually converge.
