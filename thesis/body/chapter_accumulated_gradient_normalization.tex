@@ -173,5 +173,9 @@ Furthermore, let us consider the case for \textsc{dynsgd} when $\lambda = 15$. I
   \label{fig:agn_experiment_2}
 \end{figure}
 
+An additional observation from Figure~\ref{fig:agn_experiment_1} and Figure~\ref{fig:agn_experiment_2}, one we made before in Chapter~\ref{chapter:distributed_deep_learning}, is that the validation accuracy of \textsc{aeasgd} is in accordance with the training accuracy, meaning, the optimizer does not seem to overfit. The reason for this lies, according to us, with the \textsc{easgd} equilibrium condition, described in Section~\ref{sec:easgd}. The quilibrium condition will prevent the central variable moving too close to a minima, preventing the central variable from overfitting.\\
+
+Since \textsc{aeasgd} and \textsc{agn} are cleary outperforming \textsc{dynsgd} in terms of training time and validation accuracy for this particular experiment, the following experiments will only consider \textsc{aeasgd} and \textsc{agn}. To evaluate the performance of these optimizers under different conditions, we will conduct several experiments using the same hyperparameterizations we mentioned at the start of this Section, which will evaluate the performance of \textsc{agn} and \textsc{aeasgd} with respect to different (distributed) hyperparameters, i.e., number of workers, and communication frequency.
+
 \section{Theoretical Analysis}
 \label{sec:agn_theoretical_analysis}

@@ -38,6 +38,7 @@
 \usepackage{tikz}                     % Drawings
 \usepackage{url}                      % Simple URL typesetting
 \usepackage{subcaption}               % Subcaptions and subfigures.
+\usepackage{listings}
 
 % Define page structure using Geometry.
 % For printing, set right to 35mm
@@ -109,7 +110,22 @@
 % Start appendices.
 \appendix
 \appendixpage
-\noappendicestocpagenum
-\addappheadtotoc
+
+\section{MNIST Model}
+\label{appendix:mnist_model}
+
+This Section describes the model that has been used in smaller experiments throughout this thesis. In essence it is a very simple model, the model consists of several layers with relu activations, where finally we apply \emph{softmax} to the output layer.
+
+\begin{lstlisting}[language=Python]
+mlp = Sequential()
+mlp.add(Dense(1000, input_shape=(784,)))
+mlp.add(Activation('relu'))
+mlp.add(Dense(2000))
+mlp.add(Activation('relu'))
+mlp.add(Dense(1000))
+mlp.add(Activation('relu'))
+mlp.add(Dense(10))
+mlp.add(Activation('softmax'))
+\end{lstlisting}
 
 \end{document}
