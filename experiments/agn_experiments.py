@@ -43,7 +43,7 @@ def allocate_spark_context(num_workers, using_spark_two=False):
     conf.set("spark.shuffle.spill", "true")
     conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
     # Check if we are using Apache Spark 2.
-    if using_spark_2:
+    if using_spark_two:
         from pyspark.sql import SparkSession
         sc = SparkSession.builder.config(conf=conf) \
                                  .appName(application_name) \
