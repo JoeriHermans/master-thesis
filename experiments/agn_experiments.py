@@ -122,7 +122,7 @@ def run_experiment(num_workers, communication_frequency):
     trained_model = optimizer.train(training_set)
     history = optimizer.get_averaged_history()
     training_accuracy = obtain_training_accuracy(history)
-    validation_accuracy = obtain_validation_accuracy(num_workers)
+    validation_accuracy = obtain_validation_accuracy(trained_model)
     training_time = optimizer.get_training_time()
     # Debug info at test start.
     print("Starting test: n = " + str(num_workers) + " - lambda = " + str(communication_frequency))
