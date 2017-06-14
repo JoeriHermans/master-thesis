@@ -1,5 +1,9 @@
 """Script which collects the results of all AGN experiments
-summarized in Table 3.1 of the thesis.
+summarized in Table 3.1 of the thesis. To goal of this experiment
+is to collect data on AGN for differint distributed hyperparameters.
+
+The script will produced a pickled output file (dictionary), which later
+can be used for further processing and analysis.
 
 Author:    Joeri R. Hermans
 """
@@ -24,6 +28,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 import numpy as np
+
+import pickle
 
 
 def allocate_spark_context(num_workers, using_spark_two=False):
@@ -60,9 +66,78 @@ def allocate_spark_context(num_workers, using_spark_two=False):
     return sc, reader
 
 
-def main():
-    sc, reader = allocate_spark_context(num_workers=20)
+def obtain_training_accuracy(history):
+    """Returns the training accuracy of the model."""
+    return history[len(history) - 1][1]
+
+
+def obtain_validation_accuracy(model):
+    """Returns the validation accuracy of the model."""
+    evaluator = AccuracyEvaluator(prediction_col="prediction_index", label_col="label")
+    predictor = ModelPredictor(keras_model=model, features_col="features_normalized_dense")
+    transformer = LabelIndexTransformer(output_dim=10)
+    validation_set = validation.select("features_normalized_dense", "label")
+    validation_set = predictor.predict(validation_set)
+    validation_set = transformer.transform(validation_set)
+    score = evaluator.evaluate(validation_set)
+
+    return score
+
+
+def run_experiment(num_workers, communication_frequency):
+    """Runs the AGN experiment with the specified number of workers, and
+    communication frequency.
+    """
+    data = {}
+    # Allocate a Spark context with the specified number of executors.
+    sc, reader = allocate_spark_context(num_workers)
+    # Read the training and validation set.
+    training_set = reader.read.parquet("data/mnist_train.parquet").repartition(num_workers)
+    training_set.persist(StorageLevel.MEMORY_AND_DISK)
+    validation_set = reader.read.parquet("data/mnist_test.parquet")
+    validation_set.persist(StorageLevel.MEMORY_AND_DISK)
+    training_set.count()
+    # Allocate the AGN optimizer.
+    optimizer = ADAG(keras_model=mlp, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
+                     batch_size=128, communication_window=40, num_epoch=40,
+                     features_col="features_normalized_dense", label_col="label_encoded")
+    # Collect the training data, and train the model.
+    trained_model = optimizer.train(training_set)
+    history = optimizer.get_averaged_history()
+    training_accuracy = obtain_training_accuracy(history)
+    validation_accuracy = obtain_validation_accuracy(num_workers)
+    training_time = optimizer.get_training_time()
+    # Debug info at test start.
+    print("Starting test: n = " + str(num_workers) + " - lambda = " + str(communication_frequency))
+    # Store the metrics.
+    data['history'] = history
+    data['training_accuracy'] = training_accuracy
+    data['validation_accuracy'] = validation_accuracy
+    data['training_time'] = training_time
+    # Debug info at test end.
+    print("TRAINING ACCURACY: " + str(training_accuracy))
+    print("VALIDATION ACCURACY: " + str(validation_accuracy))
+    print("TRAINING TIME: " + str(training_time))
+    # Close the Spark context.
     sc.close()
+
+    return data
+
+
+def main():
+    # Allocate a data dictionary to store experimental results.
+    data = {}
+    # Set the hyperparameters that need to be tested.
+    workers = np.arange(10, 41, 5) # 10, 15, 20, 25, 30, 35, 40
+    lambdas = np.arange(5, 61, 5) # 5. 10, 15, 20, 25, 30, ...
+    for w in workers:
+        data[w] = {}
+        for l in lambdas:
+            # Run the experiment with the specified hyperparameters.
+            data[w][l] = run_experiment(w, l)
+    # Save the data dictionary.
+    with open('agn_results.pickle', 'wb') as handle:
+        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == '__main__':
