@@ -156,7 +156,7 @@ def main():
         for l in lambdas:
             # Run the experiment with the specified hyperparameters.
             with Pool(1) as p:
-                data[w][l] = p.run(run_experiment, [(int(w), int(l))])
+                data[w][l] = p.map(run_experiment, [(int(w), int(l))])
     # Save the data dictionary.
     with open('agn_results.pickle', 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
