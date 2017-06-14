@@ -84,6 +84,21 @@ def obtain_validation_accuracy(model):
     return score
 
 
+def construct_model():
+    """Constructs the Keras model that will be used during training."""
+    mlp = Sequential()
+    mlp.add(Dense(1000, input_shape=(784,)))
+    mlp.add(Activation('relu'))
+    mlp.add(Dense(2000))
+    mlp.add(Activation('relu'))
+    mlp.add(Dense(1000))
+    mlp.add(Activation('relu'))
+    mlp.add(Dense(10))
+    mlp.add(Activation('softmax'))
+
+    return mlp
+
+
 def run_experiment(num_workers, communication_frequency):
     """Runs the AGN experiment with the specified number of workers, and
     communication frequency.
@@ -97,8 +112,10 @@ def run_experiment(num_workers, communication_frequency):
     validation_set = reader.read.parquet("data/mnist_test.parquet")
     validation_set.persist(StorageLevel.MEMORY_AND_DISK)
     training_set.count()
+    # Construct the Keras model.
+    model = construct_model()
     # Allocate the AGN optimizer.
-    optimizer = ADAG(keras_model=mlp, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
+    optimizer = ADAG(keras_model=model, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
                      batch_size=128, communication_window=40, num_epoch=40,
                      features_col="features_normalized_dense", label_col="label_encoded")
     # Collect the training data, and train the model.
