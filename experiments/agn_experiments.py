@@ -120,7 +120,7 @@ def run_experiment(t):
     model = construct_model()
     # Allocate the AGN optimizer.
     optimizer = ADAG(keras_model=model, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
-                     batch_size=128, communication_window=commmunication_frequency, num_epoch=40,
+                     batch_size=128, communication_window=communication_frequency, num_epoch=40,
                      features_col="features_normalized_dense", label_col="label_encoded")
     # Collect the training data, and train the model.
     trained_model = optimizer.train(training_set)
