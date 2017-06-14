@@ -151,7 +151,7 @@ def main():
         data[w] = {}
         for l in lambdas:
             # Run the experiment with the specified hyperparameters.
-            data[w][l] = run_experiment(w, l)
+            data[w][l] = run_experiment(int(w), int(l))
     # Save the data dictionary.
     with open('agn_results.pickle', 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
