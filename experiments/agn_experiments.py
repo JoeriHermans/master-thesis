@@ -20,6 +20,8 @@ from keras.layers.core import *
 from keras.models import *
 from keras.optimizers import *
 
+from multiprocessing import Pool
+
 from pyspark import SparkConf
 from pyspark import SparkContext
 from pyspark.storagelevel import StorageLevel
@@ -99,11 +101,13 @@ def construct_model():
     return mlp
 
 
-def run_experiment(num_workers, communication_frequency):
+def run_experiment(t):
     """Runs the AGN experiment with the specified number of workers, and
     communication frequency.
     """
     data = {}
+    num_workers = t[0]
+    communication_frequency = t[1]
     # Allocate a Spark context with the specified number of executors.
     sc, reader = allocate_spark_context(num_workers)
     # Read the training and validation set.
@@ -116,7 +120,7 @@ def run_experiment(num_workers, communication_frequency):
     model = construct_model()
     # Allocate the AGN optimizer.
     optimizer = ADAG(keras_model=model, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
-                     batch_size=128, communication_window=40, num_epoch=40,
+                     batch_size=128, communication_window=commmunication_frequency, num_epoch=40,
                      features_col="features_normalized_dense", label_col="label_encoded")
     # Collect the training data, and train the model.
     trained_model = optimizer.train(training_set)
@@ -125,7 +129,7 @@ def run_experiment(num_workers, communication_frequency):
     validation_accuracy = obtain_validation_accuracy(trained_model, validation_set)
     training_time = optimizer.get_training_time()
     # Debug info at test start.
-    print("Starting test: n = " + str(num_workers) + " - lambda = " + str(communication_frequency))
+    print("Test: n = " + str(num_workers) + " - lambda = " + str(communication_frequency))
     # Store the metrics.
     data['history'] = history
     data['training_accuracy'] = training_accuracy
@@ -151,7 +155,8 @@ def main():
         data[w] = {}
         for l in lambdas:
             # Run the experiment with the specified hyperparameters.
-            data[w][l] = run_experiment(int(w), int(l))
+            with Pool(1) as p:
+                data[w][l] = p.run(run_experiment, [(int(w), int(l))])
     # Save the data dictionary.
     with open('agn_results.pickle', 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
