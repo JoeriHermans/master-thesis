@@ -71,7 +71,7 @@ def obtain_training_accuracy(history):
     return history[len(history) - 1][1]
 
 
-def obtain_validation_accuracy(model):
+def obtain_validation_accuracy(model, validation):
     """Returns the validation accuracy of the model."""
     evaluator = AccuracyEvaluator(prediction_col="prediction_index", label_col="label")
     predictor = ModelPredictor(keras_model=model, features_col="features_normalized_dense")
@@ -122,7 +122,7 @@ def run_experiment(num_workers, communication_frequency):
     trained_model = optimizer.train(training_set)
     history = optimizer.get_averaged_history()
     training_accuracy = obtain_training_accuracy(history)
-    validation_accuracy = obtain_validation_accuracy(trained_model)
+    validation_accuracy = obtain_validation_accuracy(trained_model, validation_set)
     training_time = optimizer.get_training_time()
     # Debug info at test start.
     print("Starting test: n = " + str(num_workers) + " - lambda = " + str(communication_frequency))
