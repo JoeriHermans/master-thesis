@@ -136,7 +136,7 @@ def run_experiment(num_workers, communication_frequency):
     print("VALIDATION ACCURACY: " + str(validation_accuracy))
     print("TRAINING TIME: " + str(training_time))
     # Close the Spark context.
-    sc.close()
+    sc.stop()
 
     return data
 
