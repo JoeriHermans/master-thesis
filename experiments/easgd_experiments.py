@@ -1,4 +1,4 @@
-"""Script which collects the results of all AGN experiments
+"""Script which collects the results of all EASGD experiments
 summarized in Table 3.1 of the thesis. To goal of this experiment
 is to collect data on AGN for differint distributed hyperparameters.
 
@@ -102,7 +102,7 @@ def construct_model():
 
 
 def run_experiment(t):
-    """Runs the AGN experiment with the specified number of workers, and
+    """Runs the EASGD experiment with the specified number of workers, and
     communication frequency.
     """
     data = {}
@@ -119,9 +119,9 @@ def run_experiment(t):
     # Construct the Keras model.
     model = construct_model()
     # Allocate the AGN optimizer.
-    optimizer = ADAG(keras_model=model, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
-                     batch_size=128, communication_window=communication_frequency, num_epoch=40,
-                     features_col="features_normalized_dense", label_col="label_encoded")
+    optimizer = AEASGD(keras_model=model, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
+                       batch_size=128, communication_window=communication_frequency, num_epoch=40, learning_rate=0.01,
+                       features_col="features_normalized_dense", label_col="label_encoded")
     # Collect the training data, and train the model.
     trained_model = optimizer.train(training_set)
     history = optimizer.get_averaged_history()
@@ -158,7 +158,7 @@ def main():
             with Pool(1) as p:
                 data[w][l] = p.map(run_experiment, [(int(w), int(l))])
     # Save the data dictionary.
-    with open('agn_results.pickle', 'wb') as handle:
+    with open('aeasgd_results.pickle', 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
