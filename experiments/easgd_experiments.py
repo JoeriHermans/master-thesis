@@ -131,7 +131,8 @@ def run_experiment(t):
     # Debug info at test start.
     print("Test: n = " + str(num_workers) + " - lambda = " + str(communication_frequency))
     # Store the metrics.
-    data['history'] = history
+    data['history'] = optimizer.history
+    data['averaged_history'] = history
     data['training_accuracy'] = training_accuracy
     data['validation_accuracy'] = validation_accuracy
     data['training_time'] = training_time
