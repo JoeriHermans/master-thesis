@@ -39,7 +39,7 @@ def allocate_spark_context(num_workers, using_spark_two=False):
     workers (Spark executors).
     """
     conf = SparkConf()
-    conf.set("spark.app.name", "AGN Experimental Validation")
+    conf.set("spark.app.name", "AEASGD Experimental Validation")
     conf.set("spark.master", "yarn-client")
     conf.set("spark.executor.cores", "1")
     conf.set("spark.executor.instances", str(num_workers))
