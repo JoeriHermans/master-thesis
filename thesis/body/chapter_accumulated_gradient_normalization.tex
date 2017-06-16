@@ -173,9 +173,288 @@ Furthermore, let us consider the case for \textsc{dynsgd} when $\lambda = 15$. I
   \label{fig:agn_experiment_2}
 \end{figure}
 
-An additional observation from Figure~\ref{fig:agn_experiment_1} and Figure~\ref{fig:agn_experiment_2}, one we made before in Chapter~\ref{chapter:distributed_deep_learning}, is that the validation accuracy of \textsc{aeasgd} is in accordance with the training accuracy, meaning, the optimizer does not seem to overfit. The reason for this lies, according to us, with the \textsc{easgd} equilibrium condition, described in Section~\ref{sec:easgd}. The quilibrium condition will prevent the central variable moving too close to a minima, preventing the central variable from overfitting.\\
+An additional observation from Figure~\ref{fig:agn_experiment_1} and Figure~\ref{fig:agn_experiment_2}, one we made before in Chapter~\ref{chapter:distributed_deep_learning}, is that the validation accuracy of \textsc{aeasgd} is in accordance with the training accuracy, meaning, the optimizer does not seem to overfit. The reason for this lies, according to us, with the \textsc{easgd} equilibrium condition, described in Section~\ref{sec:easgd}. The quilibrium condition will prevent the central variable moving too close to a minima, preventing the central variable from overfitting. Since \textsc{aeasgd} and \textsc{agn} are cleary outperforming \textsc{dynsgd} in terms of training time and validation accuracy for this particular experiment, the following experiments will only consider \textsc{aeasgd} and \textsc{agn}. To evaluate the performance of these optimizers under different conditions, we will conduct several experiments using the same hyperparameterizations we mentioned at the start of this Section, which will evaluate the performance of \textsc{agn} and \textsc{aeasgd} with respect to different (distributed) hyperparameters, i.e., number of workers, and communication frequency. As before, no learning rate decay is applied.\\
 
-Since \textsc{aeasgd} and \textsc{agn} are cleary outperforming \textsc{dynsgd} in terms of training time and validation accuracy for this particular experiment, the following experiments will only consider \textsc{aeasgd} and \textsc{agn}. To evaluate the performance of these optimizers under different conditions, we will conduct several experiments using the same hyperparameterizations we mentioned at the start of this Section, which will evaluate the performance of \textsc{agn} and \textsc{aeasgd} with respect to different (distributed) hyperparameters, i.e., number of workers, and communication frequency. As before, no learning rate decay is performed.
+Initial observations from our results, summarized in Table~\ref{table:agn_experiments_summary}, indicate that \textsc{agn} performes better compared to \textsc{aeasgd} when a low communication frequency is used (which is a design requirement of \textsc{(a)easgd}), and a high number of asynchronous workers are deployed. Furthermore, when we increase the number of asynchronous workers, we observe a significant drop in training, and validation accuracy in \textsc{aeasgd}.
 
-\section{Theoretical Analysis}
-\label{sec:agn_theoretical_analysis}
+\begin{table}[H]
+  \centering
+  \begin{tabular}{|c|c|c|c|c|c|c|c|}
+    \hline
+    $n$ & $\lambda$ & \textsc{AGN} $t$ & \textsc{AGN} Acc. & \textsc{AGN} Val. & \textsc{AEASGD} $t$ & \textsc{AEASGD} Acc. & \textsc{AEASGD} Val. \\
+    \hline
+    \hline
+10 & 10 & 1066.08s & \textbf{100.00\%} & 98.43\% & \textbf{953.61s} & 99.22\% & \textbf{98.64\%}  \\
+\hline
+10 & 15 & 864.01s & \textbf{99.53\%} & 98.54\% & \textbf{846.86s} & 99.38\% & \textbf{98.69\%}  \\
+\hline
+10 & 20 & 886.34s & \textbf{99.38\%} & 98.61\% & \textbf{804.07s} & 98.91\% & \textbf{98.67\%}  \\
+\hline
+10 & 25 & 855.51s & 98.75\% & 98.52\% & \textbf{784.46s} & \textbf{98.91\%} & \textbf{98.74\%}  \\
+\hline
+10 & 30 & \textbf{886.01s} & \textbf{99.22\%} & 98.50\% & 930.73s & 98.91\% & \textbf{98.64\%}  \\
+\hline
+10 & 35 & 850.87s & 98.44\% & 98.42\% & \textbf{798.74s} & \textbf{99.22\%} & \textbf{98.62\%}  \\
+\hline
+10 & 40 & 845.21s & \textbf{98.75\%} & 98.43\% & \textbf{791.04s} & 97.66\% & \textbf{98.58\%}  \\
+\hline
+15 & 10 & 979.72s & \textbf{99.67\%} & 98.61\% & \textbf{813.32s} & 99.11\% & \textbf{98.67\%}  \\
+\hline
+15 & 15 & \textbf{638.13s} & \textbf{99.89\%} & 98.58\% & 721.47s & 98.66\% & \textbf{98.65\%}  \\
+\hline
+15 & 20 & \textbf{562.72s} & \textbf{99.89\%} & 98.49\% & 564.92s & 99.00\% & \textbf{98.60\%}  \\
+\hline
+15 & 25 & 580.71s & \textbf{98.77\%} & 98.50\% & \textbf{542.28s} & 98.33\% & \textbf{98.62\%}  \\
+\hline
+15 & 30 & \textbf{544.97s} & 98.44\% & 98.44\% & 660.58s & \textbf{98.55\%} & \textbf{98.58\%}  \\
+\hline
+15 & 35 & \textbf{562.93s} & \textbf{98.66\%} & 98.45\% & 573.54s & 98.33\% & 98.45\%  \\
+\hline
+15 & 40 & \textbf{561.17s} & \textbf{99.22\%} & 98.42\% & 566.00s & 98.88\% & \textbf{98.52\%}  \\
+\hline
+20 & 10 & 839.94s & \textbf{99.26\%} & 98.36\% & \textbf{821.12s} & 97.90\% & \textbf{98.52\%}  \\
+\hline
+20 & 15 & \textbf{571.17s} & \textbf{100.00\%} & 98.45\% & 610.88s & 98.52\% & \textbf{98.49\%}  \\
+\hline
+20 & 20 & \textbf{432.93s} & \textbf{99.38\%} & \textbf{98.47\%} & 510.72s & 97.78\% & 98.39\%  \\
+\hline
+20 & 25 & 479.72s & \textbf{99.63\%} & \textbf{98.45\%} & \textbf{421.50s} & 97.86\% & 98.34\%  \\
+\hline
+20 & 30 & 433.36s & \textbf{99.42\%} & \textbf{98.49\%} & \textbf{429.16s} & 98.36\% & 98.33\%  \\
+\hline
+20 & 35 & 418.83s & \textbf{98.52\%} & \textbf{98.44\%} & \textbf{409.86s} & 98.19\% & 98.33\%  \\
+\hline
+20 & 40 & 434.86s & \textbf{98.44\%} & \textbf{98.34\%} & \textbf{420.46s} & 97.66\% & 98.28\%  \\
+\hline
+25 & 10 & 768.45s & \textbf{98.62\%} & 97.87\% & \textbf{753.27s} & 98.26\% & \textbf{98.40\%}  \\
+\hline
+25 & 15 & \textbf{524.85s} & \textbf{99.76\%} & \textbf{98.57\%} & 540.20s & 98.32\% & 98.32\%  \\
+\hline
+25 & 20 & 455.92s & \textbf{99.70\%} & \textbf{98.52\%} & \textbf{401.17s} & 97.66\% & 98.23\%  \\
+\hline
+25 & 25 & \textbf{351.30s} & \textbf{99.10\%} & \textbf{98.44\%} & 372.74s & 98.44\% & 98.26\%  \\
+\hline
+25 & 30 & 365.58s & \textbf{98.56\%} & \textbf{98.48\%} & \textbf{364.29s} & 98.20\% & 98.14\%  \\
+\hline
+25 & 35 & \textbf{364.04s} & \textbf{98.32\%} & \textbf{98.46\%} & 371.01s & 97.54\% & 98.02\%  \\
+\hline
+25 & 40 & 373.22s & \textbf{98.05\%} & \textbf{98.35\%} & \textbf{346.99s} & 97.72\% & 98.04\%  \\
+\hline
+30 & 10 & 778.42s & 97.92\% & 97.25\% & \textbf{764.59s} & \textbf{99.17\%} & \textbf{98.28\%}  \\
+\hline
+30 & 15 & \textbf{507.43s} & \textbf{99.72\%} & \textbf{98.51\%} & 527.42s & 98.12\% & 98.13\%  \\
+\hline
+30 & 20 & \textbf{428.09s} & \textbf{99.74\%} & \textbf{98.48\%} & 461.58s & 97.92\% & 98.03\%  \\
+\hline
+30 & 25 & 341.44s & \textbf{99.01\%} & \textbf{98.48\%} & \textbf{334.52s} & 98.59\% & 97.96\%  \\
+\hline
+30 & 30 & 318.41s & \textbf{99.17\%} & \textbf{98.39\%} & \textbf{310.19s} & 97.66\% & 97.77\%  \\
+\hline
+30 & 35 & 312.96s & \textbf{99.17\%} & \textbf{98.35\%} & \textbf{305.48s} & 98.28\% & 97.86\%  \\
+\hline
+30 & 40 & \textbf{316.68s} & \textbf{98.65\%} & \textbf{98.30\%} & 343.07s & 98.28\% & 97.73\%  \\
+\hline
+35 & 10 & \textbf{691.38s} & 96.65\% & 96.74\% & 785.00s & \textbf{98.09\%} & \textbf{97.96\%}  \\
+\hline
+35 & 15 & \textbf{511.17s} & \textbf{99.01\%} & \textbf{98.18\%} & 515.88s & 97.91\% & 98.06\%  \\
+\hline
+35 & 20 & \textbf{390.05s} & \textbf{99.61\%} & \textbf{98.51\%} & 405.90s & 97.77\% & 98.01\%  \\
+\hline
+35 & 25 & \textbf{314.71s} & \textbf{99.52\%} & \textbf{98.37\%} & 324.66s & 97.82\% & 97.81\%  \\
+\hline
+35 & 30 & \textbf{273.62s} & \textbf{98.67\%} & \textbf{98.43\%} & 379.93s & 97.63\% & 97.82\%  \\
+\hline
+35 & 35 & \textbf{276.11s} & \textbf{99.29\%} & \textbf{98.13\%} & 357.71s & 97.50\% & 97.84\%  \\
+\hline
+35 & 40 & \textbf{284.50s} & \textbf{98.69\%} & \textbf{98.17\%} & 543.86s & 97.79\% & 97.59\%  \\
+\hline
+40 & 10 & \textbf{748.94s} & 94.17\% & 95.55\% & 1256.09s & \textbf{96.57\%} & \textbf{97.99\%}  \\
+\hline
+40 & 15 & \textbf{506.25s} & 95.99\% & 97.25\% & 534.42s & \textbf{96.88\%} & \textbf{97.89\%}  \\
+\hline
+40 & 20 & \textbf{383.51s} & \textbf{99.24\%} & \textbf{98.40\%} & 412.37s & 96.65\% & 97.83\%  \\
+\hline
+40 & 25 & \textbf{308.15s} & \textbf{98.86\%} & \textbf{98.39\%} & 347.50s & 96.65\% & 97.67\%  \\
+\hline
+40 & 30 & 351.54s & \textbf{98.66\%} & \textbf{98.45\%} & \textbf{305.50s} & 96.47\% & 97.67\%  \\
+\hline
+40 & 35 & 279.30s & \textbf{98.73\%} & \textbf{98.32\%} & \textbf{252.70s} & 96.32\% & 97.60\%  \\
+\hline
+40 & 40 & 257.62s & \textbf{97.88\%} & \textbf{98.18\%} & \textbf{250.74s} & 96.65\% & 97.45\%  \\
+\hline
+  \end{tabular}
+  \caption{Summary of \textsc{agn} and \textsc{aeasgd} experiments using different distributed hyperparameters ($n$ and $\lambda$). From these experiments we find that \textsc{agn} performs better in terms of training, and validation accuracy in the precense of a higher number of asynchronous workers, and a reduced communication frequency. Furthermore, the experiments where \textsc{aeasgd} did perform better with a high number of asynchronous workers, and a low communication frequency, are usually attributed due to system load and (very) stale gradients (as the training time for these experiments are outliers).}
+  \label{table:agn_experiments_summary}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=.5\textwidth]{resources/images/agn_aeasgd_workers}
+  \caption{Decline}
+  \label{fig:agn_aeasgd_workers_performance_decline}
+\end{figure}
+
+\newpage
+\begin{figure}
+  \centering
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_10}
+    \caption{$n = 10$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_15}
+    \caption{$n = 15$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_20}
+    \caption{$n = 20$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_25}
+    \caption{$n = 25$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_30}
+    \caption{$n = 30$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_35}
+    \caption{$n = 35$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_40}
+    \caption{$n = 40$}
+  \end{subfigure}
+  \label{fig:agn_experiments_workers}
+  \caption{Test}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_10}
+    \caption{$\lambda = 10$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_15}
+    \caption{$\lambda = 15$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_20}
+    \caption{$\lambda = 20$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_25}
+    \caption{$\lambda = 25$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_30}
+    \caption{$\lambda = 30$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_35}
+    \caption{$\lambda = 35$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_40}
+    \caption{$\lambda = 40$}
+  \end{subfigure}
+  \label{fig:agn_experiments_lambdas}
+  \caption{Test}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_10}
+    \caption{$n = 10$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_15}
+    \caption{$n = 15$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_20}
+    \caption{$n = 20$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_25}
+    \caption{$n = 25$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_30}
+    \caption{$n = 30$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_35}
+    \caption{$n = 35$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_40}
+    \caption{$n = 40$}
+  \end{subfigure}
+  \label{fig:aeasgd_experiments_workers}
+  \caption{Test}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_10}
+    \caption{$\lambda = 10$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_15}
+    \caption{$\lambda = 15$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_20}
+    \caption{$\lambda = 20$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_25}
+    \caption{$\lambda = 25$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_30}
+    \caption{$\lambda = 30$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_35}
+    \caption{$\lambda = 35$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_40}
+    \caption{$\lambda = 40$}
+  \end{subfigure}
+  \label{fig:aeasgd_experiments_lambdas}
+  \caption{Test}
+\end{figure}
