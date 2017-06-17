@@ -110,7 +110,7 @@ An interesting thought experiment would be what would happen in the case that th
 
 In order to completely understand how the worker deltas would look like after $\lambda = \infty$ steps, one first needs to understand the individual components of Equation~\ref{eq:agn_thought_experiment}. The most inner component, $\eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})$, is just the computation of a mini-batch using $m - 1$ samples, where index $i$ denotes the current step in the gradient accumulation. Please note that a mini-batch can differ for different values of $i$ as training samples are randomly retrieved from the dataset. After computing the gradient based on the mini-batch, the local model will be updated as $\theta_{i + 1} = \theta_i - \eta_t\frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})$. This process goes on for $\lambda$ steps, while at the end, the accumulated is normalized with respect to $\lambda$.\\
 
-Let us assume we have a smooth convex error space, or a smooth non-convex error space with at least a single minima. Due to the existance of a minima in both cases, first order gradients will eventually converge to such a minima, or in the neighbourhood of said minima. Furthermore, we  make the assumption that the hyperparameterization during the training procedure will not change. For instance, no learning rate decay after $x$ number of steps. Under these assumptions, it is trivial to realize that applying gradient descent for $\infty$ steps will cause the parameterization to converge in a minima. Of course, given that the hyperparameterization, and the data allow for convergence to occur. As a result, the term $\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})$ is finite, even after applying $\infty$ steps of mini-batch updates. To simplify our problem, let us denote $\vec{c}$ as the \emph{finite} result of the top term in Equation~\ref{eq:agn_thought_experiment} for $\lambda = \infty$. Therefore, we can write Equation~\ref{eq:agn_thought_experiment} as Equation~\ref{eq:agn_thought_experiment_2}. Furthermore, since $\vec{c}$ is finite, Equation~\ref{eq:agn_thought_experiment_2} can be treated as an instance of $\frac{1}{\infty}$, which approaches 0. Subsequently, Equation~\ref{eq:agn_thought_experiment_2} is 0 in the limit to infinity.
+Let us assume we have a smooth convex error space, or a smooth non-convex error space with at least a single minima. Due to the existance of a minima in both cases, first order gradients will eventually converge to, or in the neighbourhood of said minima. Furthermore, we  make the assumption that the hyperparameterization during the training procedure will not change. For instance, no learning rate decay after $x$ number of steps. Under these assumptions, it is trivial to realize that applying gradient descent for $\infty$ steps will cause the parameterization to converge in a minima. Of course, given that the hyperparameterization, and the data allow for convergence to occur. As a result, the term $\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_{j = 0}^{m - 1} \nabla_\theta \mathcal{L}(\theta_i;x_{ij};y_{ij})$ is finite, even after applying $\infty$ steps of mini-batch updates. To simplify our problem, let us denote $\vec{c}$ as the \emph{finite} result of the top term in Equation~\ref{eq:agn_thought_experiment} for $\lambda = \infty$. Therefore, we can write Equation~\ref{eq:agn_thought_experiment} as Equation~\ref{eq:agn_thought_experiment_2}. Furthermore, since $\vec{c}$ is finite, Equation~\ref{eq:agn_thought_experiment_2} can be treated as an instance of $\frac{1}{\infty}$, which approaches 0. Subsequently, Equation~\ref{eq:agn_thought_experiment_2} is 0 in the limit to infinity.
 
 \begin{equation}
   \label{eq:agn_thought_experiment_2}
@@ -175,9 +175,41 @@ Furthermore, let us consider the case for \textsc{dynsgd} when $\lambda = 15$. I
 
 An additional observation from Figure~\ref{fig:agn_experiment_1} and Figure~\ref{fig:agn_experiment_2}, one we made before in Chapter~\ref{chapter:distributed_deep_learning}, is that the validation accuracy of \textsc{aeasgd} is in accordance with the training accuracy, meaning, the optimizer does not seem to overfit. The reason for this lies, according to us, with the \textsc{easgd} equilibrium condition, described in Section~\ref{sec:easgd}. The quilibrium condition will prevent the central variable moving too close to a minima, preventing the central variable from overfitting. Since \textsc{aeasgd} and \textsc{agn} are cleary outperforming \textsc{dynsgd} in terms of training time and validation accuracy for this particular experiment, the following experiments will only consider \textsc{aeasgd} and \textsc{agn}. To evaluate the performance of these optimizers under different conditions, we will conduct several experiments using the same hyperparameterizations we mentioned at the start of this Section, which will evaluate the performance of \textsc{agn} and \textsc{aeasgd} with respect to different (distributed) hyperparameters, i.e., number of workers, and communication frequency. As before, no learning rate decay is applied.\\
 
-Initial observations from our results, summarized in Table~\ref{table:agn_experiments_summary}, indicate that \textsc{agn} performes better compared to \textsc{aeasgd} when a low communication frequency is used (which is a design requirement of \textsc{(a)easgd}), and a high number of asynchronous workers are deployed. Furthermore, when we increase the number of asynchronous workers, we observe a significant drop in training, and validation accuracy in \textsc{aeasgd}.
+Initial observations from our results, summarized in Table~\ref{table:agn_experiments_summary}, indicate that \textsc{agn} performes better in terms of validation accuracy when a low communication frequency is used (which is a design requirement of \textsc{(a)easgd}), and a high number of asynchronous workers are deployed ($n \geq 20$). However, looking at the overall training accuracy of both optimizers, we observe that \textsc{agn} is significantly outperforming \textsc{aeasgd} in all configurations of the distributed hyperparameters. The reason for this might be due to the equilibrium condition of \textsc{easgd} described in Chapter~\ref{chapter:distributed_deep_learning}. Furthermore, increasing the number of asynchronous workers results in a significant drop in both training, and validation accuracy in \textsc{aeasgd}.
 
-\begin{table}[H]
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=.5\textwidth]{resources/images/agn_aeasgd_workers}
+  \caption{Decline of the training accuracy of both \textsc{agn} and \textsc{aeasgd} as the number of asynchronous workers increases. From these experiments, we observe that \textsc{agn} is more rebust to an increased amount of asynchrony as the training accuracy only starts to decrease from $n = 25$ workers, while the validation accuracy remains stable even with 40 workers.}
+  \label{fig:agn_aeasgd_workers_performance_decline}
+\end{figure}
+
+Contrary to \textsc{aeasgd}, \textsc{agn} is able to cope more effectively with an increased amount of parallelism, as its training accuracy only starts to decline from $n = 25$ asynchronous workers, while the validation accuracy is barely fluctuating (because \textsc{agn} is still slightly overfitting), as shown in Figure~\ref{fig:agn_aeasgd_workers_performance_decline}. An obvious follow-up question to this result would be to question the fact whether increasing the amount of asynchronous workers really improves the temporal efficiency optimizer, i.e., the amount of time it takes to reach a certain training accuracy. In fact, it does reduce the training time to reach a certain training accuracy, as shown in Figure~\ref{fig:agn_temporal_efficiency}. However, several factors have to be taken into account.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_temporal_efficiency}
+    \caption{Varying $\lambda$}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_temporal_efficiency_2}
+    \caption{Static $\lambda$}
+  \end{subfigure}
+  \caption{Training accuracy plots for different configurations of the distributed hyperparameters. In the case of a varying $\lambda$ with respect to the number of workers (to minimize the noise of the commits), we observe that optimizers with a higher communication frequency (small $\lambda$), is actually benifitting from the more frequent updates with the parameter server. However, as the number of asynchronous workers grows, a low communication frequency increases the noise in the commits due to parameter staleness. Furthermore, if the $lambda$ is too large, less frequent parameter server updates occur, which results in a slower convergence rate since more time is spent locally. As a result, a balance is required similar to determining the size of a mini-batch.}
+  \label{fig:agn_temporal_efficiency}
+\end{figure}
+
+The first being an increased amount of staleness that is inserted into the system as the number of asynchronous workers increase. This effect is difficult to mitigate. Previous approaches~\cite{jiang2017heterogeneity} propose to scale gradient commits down proportionally to the number of stale steps. However, as previously shown, this is not an effective solution since accumulating gradients locally, is in effect making the gradients larger, and as a result, committing accummulated gradients increases the \emph{distance} between the central variable and other workers\footnote{Which is our definition of staleness, see Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}}. The second and final issue is the balance between updating the central variable with a certain frequency, and the amount of local work to effectively reduce the training time due to high communication costs. In effect, this resembles the situation usually one has when selecting a mini-batch size $m$, i.e., do we allow for more frequent parameter updates (small $m$), or do we compute a less noisy first order gradient by increasing $m$, thereby reducing the frequency of paramter updates and the convergence of a model? To show that this is the case, let us consider Figure~\ref{fig:agn_experiments_workers} and Figure~\ref{fig:agn_experiments_lambdas}. In Figure~\ref{fig:agn_experiments_workers}, we evaluate varying values of $\lambda$ for a specific number of asynchronous workers $n$. In all cases, we observe configurations using $\lambda = 40$ usually have the slowest convergence rate with respect to other configurations with higher communication frequencies. Furthermore, an additional interesting observation, one which is in accordance with the theory we discuss in Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}, is the fact that high communication frequencies and a larger number of asynchronous workers causes divergent behaviour due to parameter staleness. Nevertheless, what is really interesting, is why configurations with low communication frequencies actually do converge, in contrast to configurations with high communication frequencies (with respect to the number of workers). Since our definition of staleness relates to the distance between the \emph{current} parameterization of a worker, and the \emph{current} parameterization of the central variable. One can imagine that increasing the number of asynchronous workers, effectively increases the \emph{distance} between the parameterizations of the workers and the \emph{current} central variable.
+
+\begin{equation}
+  \label{eq:temporal_efficiency}
+  \mathcal{E}(a,b) = \ddfrac{\int_0^\infty f_a(t) \,dt}{\int_0^\infty f_b(t) \,dt}
+\end{equation}
+
+\begin{table}
   \centering
   \begin{tabular}{|c|c|c|c|c|c|c|c|}
     \hline
@@ -283,18 +315,10 @@ Initial observations from our results, summarized in Table~\ref{table:agn_experi
 40 & 40 & 257.62s & \textbf{97.88\%} & \textbf{98.18\%} & \textbf{250.74s} & 96.65\% & 97.45\%  \\
 \hline
   \end{tabular}
-  \caption{Summary of \textsc{agn} and \textsc{aeasgd} experiments using different distributed hyperparameters ($n$ and $\lambda$). From these experiments we find that \textsc{agn} performs better in terms of training, and validation accuracy in the precense of a higher number of asynchronous workers, and a reduced communication frequency. Furthermore, the experiments where \textsc{aeasgd} did perform better with a high number of asynchronous workers, and a low communication frequency, are usually attributed due to system load and (very) stale gradients (as the training time for these experiments are outliers).}
+  \caption{Summary of \textsc{agn} and \textsc{aeasgd} experiments using different distributed hyperparameters ($n$ and $\lambda$). From these experiments we find that \textsc{agn} performs better in terms of training, and validation accuracy in the precense of a higher number of asynchronous workers, and a reduced communication frequency.}
   \label{table:agn_experiments_summary}
 \end{table}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=.5\textwidth]{resources/images/agn_aeasgd_workers}
-  \caption{Decline}
-  \label{fig:agn_aeasgd_workers_performance_decline}
-\end{figure}
-
-\newpage
 \begin{figure}
   \centering
   \begin{subfigure}{.3\textwidth}
@@ -332,8 +356,8 @@ Initial observations from our results, summarized in Table~\ref{table:agn_experi
     \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_40}
     \caption{$n = 40$}
   \end{subfigure}
-  \label{fig:agn_experiments_workers}
   \caption{Test}
+  \label{fig:agn_experiments_workers}
 \end{figure}
 
 \begin{figure}
@@ -373,8 +397,8 @@ Initial observations from our results, summarized in Table~\ref{table:agn_experi
     \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_40}
     \caption{$\lambda = 40$}
   \end{subfigure}
-  \label{fig:agn_experiments_lambdas}
   \caption{Test}
+  \label{fig:agn_experiments_lambdas}
 \end{figure}
 
 \begin{figure}
@@ -414,8 +438,8 @@ Initial observations from our results, summarized in Table~\ref{table:agn_experi
     \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_40}
     \caption{$n = 40$}
   \end{subfigure}
-  \label{fig:aeasgd_experiments_workers}
   \caption{Test}
+  \label{fig:aeasgd_experiments_workers}
 \end{figure}
 
 \begin{figure}
@@ -455,6 +479,6 @@ Initial observations from our results, summarized in Table~\ref{table:agn_experi
     \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_40}
     \caption{$\lambda = 40$}
   \end{subfigure}
-  \label{fig:aeasgd_experiments_lambdas}
   \caption{Test}
+  \label{fig:aeasgd_experiments_lambdas}
 \end{figure}
