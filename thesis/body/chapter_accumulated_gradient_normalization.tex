@@ -202,12 +202,152 @@ Contrary to \textsc{aeasgd}, \textsc{agn} is able to cope more effectively with 
   \label{fig:agn_temporal_efficiency}
 \end{figure}
 
-The first being an increased amount of staleness that is inserted into the system as the number of asynchronous workers increase. This effect is difficult to mitigate. Previous approaches~\cite{jiang2017heterogeneity} propose to scale gradient commits down proportionally to the number of stale steps. However, as previously shown, this is not an effective solution since accumulating gradients locally, is in effect making the gradients larger, and as a result, committing accummulated gradients increases the \emph{distance} between the central variable and other workers\footnote{Which is our definition of staleness, see Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}}. The second and final issue is the balance between updating the central variable with a certain frequency, and the amount of local work to effectively reduce the training time due to high communication costs. In effect, this resembles the situation usually one has when selecting a mini-batch size $m$, i.e., do we allow for more frequent parameter updates (small $m$), or do we compute a less noisy first order gradient by increasing $m$, thereby reducing the frequency of paramter updates and the convergence of a model? To show that this is the case, let us consider Figure~\ref{fig:agn_experiments_workers} and Figure~\ref{fig:agn_experiments_lambdas}. In Figure~\ref{fig:agn_experiments_workers}, we evaluate varying values of $\lambda$ for a specific number of asynchronous workers $n$. In all cases, we observe configurations using $\lambda = 40$ usually have the slowest convergence rate with respect to other configurations with higher communication frequencies. Furthermore, an additional interesting observation, one which is in accordance with the theory we discuss in Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}, is the fact that high communication frequencies and a larger number of asynchronous workers causes divergent behaviour due to parameter staleness. Nevertheless, what is really interesting, is why configurations with low communication frequencies actually do converge, in contrast to configurations with high communication frequencies (with respect to the number of workers). Since our definition of staleness relates to the distance between the \emph{current} parameterization of a worker, and the \emph{current} parameterization of the central variable. One can imagine that increasing the number of asynchronous workers, effectively increases the \emph{distance} between the parameterizations of the workers and the \emph{current} central variable.
+The first being an increased amount of staleness that is inserted into the system as the number of asynchronous workers increase. This effect is difficult to mitigate. Previous approaches~\cite{jiang2017heterogeneity} propose to scale gradient commits down proportionally to the number of stale steps. However, as previously shown, this is not an effective solution since accumulating gradients locally, is in effect making the gradients larger, and as a result, committing accummulated gradients increases the \emph{distance} between the central variable and other workers\footnote{Which is our definition of staleness, see Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}}. The second and final issue is the balance between updating the central variable with a certain frequency, and the amount of local work to effectively reduce the training time due to high communication costs. In effect, this resembles the situation usually one has when selecting a mini-batch size $m$, i.e., do we allow for more frequent parameter updates (small $m$), or do we compute a less noisy first order gradient by increasing $m$, thereby reducing the frequency of paramter updates and the convergence of a model? To show that this is the case, let us consider Figure~\ref{fig:agn_experiments_workers} and Figure~\ref{fig:agn_experiments_lambdas}. In Figure~\ref{fig:agn_experiments_workers}, we evaluate varying values of $\lambda$ for a specific number of asynchronous workers $n$. In all cases, we observe configurations using $\lambda = 40$ usually have the slowest convergence rate with respect to other configurations with higher communication frequencies. Furthermore, an additional interesting observation, one which is in accordance with the theory we discuss in Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}, is the fact that high communication frequencies and a larger number of asynchronous workers causes divergent behaviour due to parameter staleness.\\
+
+Nevertheless, what is really interesting, is why configurations with low communication frequencies actually do converge, in contrast to configurations with high communication frequencies (with respect to the number of workers). Since our definition of staleness relates to the distance between the \emph{current} parameterization of a worker, and the \emph{current} parameterization of the central variable. One can imagine that increasing the number of asynchronous workers, effectively increases the \emph{distance} between the parameterizations of the workers and the \emph{current} central variable due to the queueing model discussed before, i.e., worker deltas are incorperated in the central variable in a queueing fashion. Yet, parameter staleness still does not explain why configurations with low communication frequencies converge, as opposed to configurations with higher communication frequencies. The question begs, is convergence guarenteed due to the amount of local exploration, thus providing the paramater server with a better ``direction'', as shown in Figure~\ref{fig:agn_example}. Or, is it due to limit condition described in Equation~\ref{eq:agn_thought_experiment_2}, which eventually scales the worker deltas down to 0 as the communication frequency decreases ($\lambda$ increases)? This is a rather difficult question to answer. However, we are definitely not dealing with the limit condition since one expects this to be the case when \textsc{agn} approaches a minima, or when $\lambda$ approaches infinity. As a result, the convergence property of \textsc{agn} is largely dedicated to the amount of local exploration, which in turn provides the central variable with a more stable, and direct gradient towards a minima. Alternatively, consider the case when no normalization of the accumulated gradient proportional to the amount of local exploration takes place, and thereby pushing large gradients to the parameter server. We showed that this approached has the tedency to diverge despite the fact it provides a better direction, as is the case in \textsc{agn}. However, due to the magnitude of the worker delta, a lot of staleness (in terms of distance) is induced causing other workers to commit (also large) gradients in an already very stale central variable, which in turn causes the divergence we observe in a non-normalized setting.\\
+
+Now the argument on convergence rates of \textsc{agn} with respect to the communication frequency has been made, let us focus on the influence on the amount of asynchronous workers. For this, we turn to Figure~\ref{fig:agn_experiments_lambdas}, which shows the accuracy plots for several training configurations with a static communication frequency, and a varying number of asynchronous workers. Initial observations indicate that increasing the number of workers with respect to a static communication frequency, speeds up the training procedure. Of course, given the fact that the right communication frequency has been selected in order to ensure convergence. Again, as stated before, lower communication frequencies yield more stable gradients in the precense of more asynchronous workers. However, from Figure~\ref{fig:agn_experiments_workers} and Figure~\ref{fig:agn_experiments_lambdas}, can be deduced that configurations with a lower number of asynchronous workers, and with a high communication frequency actually reach a certain benchmark accuracy faster. Therefore, why spent double the amount of computational resources to achieve the same results?\\
+
+Of course, in such a case one is able to process a lot more training data in a shorter amount of time. However, this is detrimental to the accuracy of the central variable, as more staleness is induced when a larger number of workers is used. Nevertheless, we make this observation for the MNIST~\cite{mnist} dataset. However, if we would use a more challenging dataset such as CIFAR-10(0) or ImageNet, one might actually benefit from an increased amount of parallelism (workers) due to the relatively small parameter updates, which reduces the amount of staleness that workers induce into the central variable.\\
+
+To compare \textsc{agn} against \textsc{aeasgd}, we could take our \emph{temporal efficiency} metric which is described in Chapter~\ref{chapter:introduction}. However, since it basically assumes some \emph{benchmark accuracy} (see Figure~\ref{fig:agn_temporal_efficiency}), the metric might be biased because it requires a person to define a benchmark accuracy. To prevent this issue, we redefine \emph{temporal efficiency} in terms of the surface described by a training metric (be it training accuracy, or training loss). This means that for some optimizer $a$, we have a function $f_a(t)$ which describes the performance of a model at time $t$, e.g., $f_a(t)$ describes the training accuracy of the model at time $t$. If we integrate over $t$, we obtain a surface representing the performance of a model over time. If we would do this for an other optimizer $b$, and divide the surface of optimizer $a$ by the performance surface of optimizer $b$, we get a ratio which describes how optimizer $a$ is performing compared to optimizer $b$. If this ratio is larger then 1, it means that optimizer $a$ is outperforming optimizer $b$, else, it is the other way around (unless the surfaces are equal of course). However, in order to compute a \emph{fair} surface area, we have to limit the computation to the minimum $m$ of both training times. This is done to prevent that optimizers with a longer training time have a significant advantage, since they have more time to produce a better model. To summarize, we define the temporal efficiency $\mathcal{E}$ of two optimizers $a$ and $b$ as the ratio of their peformance surface, as stated in Equation~\ref{eq:temporal_efficiency}. Using this new definition of \emph{temporal efficiency}, we can make a more qualitative judgement which optimizer is performing better in different scenarios.
 
 \begin{equation}
   \label{eq:temporal_efficiency}
-  \mathcal{E}(a,b) = \ddfrac{\int_0^\infty f_a(t) \,dt}{\int_0^\infty f_b(t) \,dt}
+  \mathcal{E}(a,b) = \ddfrac{\int_0^m f_a(t) \,dt}{\int_0^m f_b(t) \,dt}
 \end{equation}
+
+Finally, we apply the new definition of \emph{temporal efficiency} to compare \textsc{agn} against \textsc{aeasgd} and summarize the results in Table~\ref{table:agn_temporal_efficiency}. However, from Figure~\ref{fig:aeasgd_experiments_workers} and Figure~\ref{fig:aeasgd_experiments_lambdas}, we make the rather strange observation that increasing the amount of asynchrony results in a deterioration of the training accuracy (which is expected since more staleness is induced). However, the rather unexpected property is that increasing the amount of asynchronous workers results in an early \emph{flattening} of the training accuracy. Again, this is due to the equilibrium condition described earlier. Since we increase the amount of asynchrony in the optimization procedure, workers will reach the equilibrium condition faster because the elastic difference is computed based on the most recent parameterization of the central variable. Meaning, as soon as \textsc{aeasgd} is done computing $\lambda$ iterations, the central variable is pulled to the worker where the elastic difference is computed based on the recently pulled central variable, which is very stale (again, using our definition of staleness) due to the low communication frequency and high number of asynchronous workers. As a result, \textsc{aeasgd} has troubles reaching a better training accuracy.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_aeasgd_temporal_worst}
+    \caption{$\mathcal{E}(\textsc{agn}, \textsc{aeasgd}) = 0.964$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_aeasgd_temporal_equal}
+    \caption{$\mathcal{E}(\textsc{agn}, \textsc{aeasgd}) = 0.999$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/agn_aeasgd_temporal_best}
+    \caption{$\mathcal{E}(\textsc{agn}, \textsc{aeasgd}) = 1.044$}
+  \end{subfigure}
+  \caption{Several accuracy plots of \textsc{agn} and \textsc{aeasgd}. All subfigures show the computed \emph{temporal efficiency} of \textsc{agn}, which were obtained by applying Equation~\ref{eq:temporal_efficiency}.}
+\end{figure}
+
+\begin{table}
+  \centering
+  \begin{tabular}{|c|c|c|}
+    \hline
+    $n$ & $\lambda$ & Temporal Efficiency \textsc{AGN} \\
+    \hline
+    \hline
+10 & 10 & \textbf{1.009} \\
+\hline
+10 & 15 & \textbf{1.012} \\
+\hline
+10 & 20 & \textbf{1.003} \\
+\hline
+10 & 25 & 0.999 \\
+\hline
+10 & 30 & 0.988 \\
+\hline
+10 & 35 & 0.990 \\
+\hline
+10 & 40 & 0.990 \\
+\hline
+15 & 10 & \textbf{1.008} \\
+\hline
+15 & 15 & \textbf{1.015} \\
+\hline
+15 & 20 & \textbf{1.009} \\
+\hline
+15 & 25 & \textbf{1.005} \\
+\hline
+15 & 30 & \textbf{1.000} \\
+\hline
+15 & 35 & 0.997 \\
+\hline
+15 & 40 & 0.994 \\
+\hline
+20 & 10 & 0.983 \\
+\hline
+20 & 15 & \textbf{1.018} \\
+\hline
+20 & 20 & \textbf{1.022} \\
+\hline
+20 & 25 & \textbf{1.009} \\
+\hline
+20 & 30 & \textbf{1.007} \\
+\hline
+20 & 35 & \textbf{1.002} \\
+\hline
+20 & 40 & 0.997 \\
+\hline
+25 & 10 & 0.954 \\
+\hline
+25 & 15 & \textbf{1.021} \\
+\hline
+25 & 20 & \textbf{1.017} \\
+\hline
+25 & 25 & \textbf{1.014} \\
+\hline
+25 & 30 & \textbf{1.008} \\
+\hline
+25 & 35 & \textbf{1.003} \\
+\hline
+25 & 40 & 0.999 \\
+\hline
+30 & 10 & 0.926 \\
+\hline
+30 & 15 & \textbf{1.017} \\
+\hline
+30 & 20 & \textbf{1.045} \\
+\hline
+30 & 25 & \textbf{1.015} \\
+\hline
+30 & 30 & \textbf{1.012} \\
+\hline
+30 & 35 & \textbf{1.005} \\
+\hline
+30 & 40 & \textbf{1.005} \\
+\hline
+35 & 10 & 0.881 \\
+\hline
+35 & 15 & 0.997 \\
+\hline
+35 & 20 & \textbf{1.017} \\
+\hline
+35 & 25 & \textbf{1.020} \\
+\hline
+35 & 30 & \textbf{1.016} \\
+\hline
+35 & 35 & \textbf{1.027} \\
+\hline
+35 & 40 & \textbf{1.012} \\
+\hline
+40 & 10 & \textbf{1.044} \\
+\hline
+40 & 15 & 0.964 \\
+\hline
+40 & 20 & \textbf{1.027} \\
+\hline
+40 & 25 & \textbf{1.025} \\
+\hline
+40 & 30 & 0.997 \\
+\hline
+40 & 35 & \textbf{1.009} \\
+\hline
+40 & 40 & \textbf{1.009} \\
+\hline
+  \end{tabular}
+  \caption{Temporal efficiency of \textsc{agn} and \textsc{aeasgd} compared to different distributed hyperparameters. Using this information, we can deduce that \textsc{agn} is outperforming \textsc{aeasgd} in 69.73\% of the cases, which is significantly better. Furthermore, this statistic includes cases which are known where \textsc{agn} is performing worse, i.e., small amount of asynchrony, low communication frequency, and high amount of asynchrony, and high communication frequency.}
+  \label{table:agn_temporal_efficiency}
+\end{table}
 
 \begin{table}
   \centering
@@ -356,7 +496,7 @@ The first being an increased amount of staleness that is inserted into the syste
     \includegraphics[width=\linewidth]{resources/images/agn_experiments_workers_40}
     \caption{$n = 40$}
   \end{subfigure}
-  \caption{Test}
+  \caption{This Figure shows several experiments were we fixed the number of workers, but vary the communication frequency. From this we observe that \textsc{agn} performs well when a relatively equal high communication frequency is used with respect to the number of workers, and derrive the following heuristic $\lambda \approx \frac{n + \text{layers in network}}{2}$. Furthermore, increasing the amount of workers, and maintaining a high communication frequency deteriorates the performance of the central variable as well. As a result, a balance between the communication frequency, and the number of asynchronous workers is required.}
   \label{fig:agn_experiments_workers}
 \end{figure}
 
@@ -397,7 +537,7 @@ The first being an increased amount of staleness that is inserted into the syste
     \includegraphics[width=\linewidth]{resources/images/agn_experiments_lambda_40}
     \caption{$\lambda = 40$}
   \end{subfigure}
-  \caption{Test}
+  \caption{In this experiment we clamp the communication frequency, but vary the number of asynchronous workers. Due to the equal communication frequency, we can observe good scaling properties of \textsc{agn}. In most cases doubling the number of workers, reducing the training time by half and is more temporally efficient. However, for larger number of workers $n > 30$ we do not observe a reduction of training time. This is due to the implementation of our parameter server, which is based on Python threads instead of Python processes, as will be dicussed in Chapter~\ref{chapter:experiments}. Furthermore, note that reducing the amount of computational resources might actually benifit the training accuracy of the central variable, as a smaller number of asynchronous workers reduces the amount of staleness that can be incorperated in the central variable.}
   \label{fig:agn_experiments_lambdas}
 \end{figure}
 
@@ -438,7 +578,7 @@ The first being an increased amount of staleness that is inserted into the syste
     \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_workers_40}
     \caption{$n = 40$}
   \end{subfigure}
-  \caption{Test}
+  \caption{\textsc{aeasgd} fixed worker, with varying communication frequency experiments. As suggested by the author, \textsc{aeasgd} usually benifits from an increased amount of local worker (large $\lambda$). Furthermore, we observe that initially, \textsc{aeasgd} is quite robust to hyperparameterization ($n = 10$). However, as the number of asynchronous workers increases, and the communication frequency is further reduced, the accuracy plots start to deviate to the point that they \emph{flatten} at a suboptimal training accuracy. Meaning, a lower training accuracy compared to other configurations, where \textsc{aeasgd} reached a significantly higher training accuracy.}
   \label{fig:aeasgd_experiments_workers}
 \end{figure}
 
@@ -479,6 +619,6 @@ The first being an increased amount of staleness that is inserted into the syste
     \includegraphics[width=\linewidth]{resources/images/aeasgd_experiments_lambda_40}
     \caption{$\lambda = 40$}
   \end{subfigure}
-  \caption{Test}
+  \caption{In this experiment we clamp the communication frequency, but vary the number of workers. As in Figure~\ref{fig:aeasgd_experiments_workers}, we do similar observations regarding the flattening of the training accuracy in the precense of a low communication frequency, and a large amount of asynchrony. However, an additional interesting observation which escaped our eye in Figure~\ref{fig:aeasgd_experiments_workers}, is the large ``bump'' in training accuracy for $n = 10$. Nevertheless, this bump is always followed up by a significant reduction in training accuracy. Usually one would expect such behaviour in a configuration with a large amount of asynchrony, but this behaviour is not present is said configurations. Furthermore, the reason why we do not observe significant fluctuations in training accuracy, contrary to \textsc{agn}, is due to hyperparameter $\rho$, which controls the amount of exploration that can be done in terms of \emph{distance}, as discussed in Chapter~\ref{chapter:distributed_deep_learning}.}
   \label{fig:aeasgd_experiments_lambdas}
 \end{figure}
