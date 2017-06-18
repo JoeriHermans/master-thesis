@@ -38,6 +38,10 @@ Using Definition~\ref{def:staleness}, we can make the deduction that staleness i
 \section{Algorithm \& Update Rule}
 \label{sec:adag_algorithm}
 
+This Section fully describes the \textsc{adag} update rule, and several architectural decisions that can be made when implementing this technique. Furthermore, using Definition~\ref{def:staleness}, we show how \textsc{adag} can push the limits of asynchronous optimization further, while at the same time eliminating the need for (distributed) hyperparameter gridsearches to ensure convergence.\\
+
+To describe the \textsc{adag} update rule, we use the same terminology and notation used in Definition~\ref{def:staleness} to further strengthen the intuition in parameter staleness, and how parameter staleness is used in Equation~\ref{eq:adag}. Let us consider the case when $\tau = 0$. In this situation, a worker $k$ computes the gradient based on $\tilde{\theta}_{t-\tau}$ which is equal to $\tilde{\theta}_t$. As a result, the distance between these two parameterizations will be 0, which results in the worker delta $\Delta\theta^k$ to be not scaled down, and causing the \textsc{adag} update rule to generalize to \textsc{sgd}. In the next step, we add more asynchronous workers to the optimization problem. By doing so, we implicitly increase the staleness as $\mathbf{E}[\tau] = (n - 1)$. As a result, parameter staleness in terms of stale steps, $\tau$, is expected to be larger than 0. Consequently, the distance between $\tilde{\theta}_t$ and $\tilde{\theta}_{t - \tau}$ is \emph{expected} to be non-zero causing the worker delta to be scaled down proportionally to the difference of these parameterizations. However, since parameter updates in Deep Learning usually consist of very small updates, we use the inverse learning rate to get a sense of the scale these updates operate at.
+
 \begin{equation}
   \label{eq:adag}
   \tilde{\theta}_{t+1} = \tilde{\theta}_t + \ddfrac{1}{\eta_t^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2 + 1} \odot \Delta\theta^k
