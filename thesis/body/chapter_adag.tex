@@ -10,34 +10,41 @@
 \chapter{Asynchronous Distributed Adaptive Gradients}
 \label{chapter:asynchronous_distributed_adaptive_gradients}
 
-In this chapter we introduce a novel optimizer called \textsc{Adag}. \textsc{Adag}, or \emph{Asynchronous Distributed Adaptive Gradients}, is an optimization process designed with data parallel methods in mind. We build upon previous work~\cite{dean2012large,hadjis2016omnivore,kingma2014adam,zhang2015deep} and incorperate new insights backed up by theory and experimental evidence. We start in Section~\ref{sec:adag_problem_setting} by formalizing the problem setting. In Section~\ref{sec:adag_previous_work}, we summarize previous work on distributed (data parallel) optimization. Section~\ref{sec:adag_algorithm} will describe our algorithm in detail, supported by intuition and theory. Finally, we experimentally show the effectiveness of our approach in Section~\ref{sec:adag_experiments} and give some points for future work in Section~\ref{sec:adag_future_work}.
+In this chapter we introduce a novel optimizer called \textsc{adag}. \textsc{adag}, or \emph{Asynchronous Distributed Adaptive Gradients}, is an optimization process designed with data parallel methods in mind. We build upon previous work~\cite{dean2012large,hadjis2016omnivore,kingma2014adam,zhang2015deep,jiang2017heterogeneity} and incorperate new insights backed up by theory and experimental evidence. We start in Section~\ref{sec:adag_problem_setting} by formalizing the problem setting. Section~\ref{sec:adag_algorithm} describes our algorithm in detail, supported by intuition and theory. Finally, we experimentally show the effectiveness of our approach in Section~\ref{sec:adag_experiments} and give some points for future work in Section~\ref{sec:adag_future_work}.
 
 \section{Problem setting}
 \label{sec:adag_problem_setting}
 
-\section{Previous work}
-\label{sec:adag_previous_work}
+Currently, staleness $\tau$ is defined in literature as the number of steps between the current timestep $t$ of the central variable, and the timestep of the central variable which a worker based its gradients upon, which is $t - \tau$. However, as shown in Chapter~\ref{chapter:distributed_deep_learning} and Chapter~\ref{chapter:accumulated_gradient_normalization}, this particular definition of staleness is problematic when one tries to mitigate parameter staleness. To illustrate this, we showed in Chapter~\ref{chapter:accumulated_gradient_normalization} that \textsc{dynsgd}~\cite{jiang2017heterogeneity}, which uses the above definition of staleness, is not able to solve the staleness problem if the learning rate is too high or gradient accumulation takes place, i.e., if the magnitude of the worker deltas is too large. Since \textsc{dynsgd} fails to deal with staleness efficiently in those situations, one can deduce that using the number of stale steps is a rather naive approach. As a result, the problem of parameter staleness in Deep Learning has an additional dimension.\\
 
-\section{Algorithm}
+A step forward in understanding the staleness problem is by gaining intuition on what mechanism is exactly causing the central variable to diverge, or converge more slowly. As mentioned in Chapter~\ref{chapter:introduction}, divergent behaviour of the central variable is caused by stale workers committing gradients which are based on old parameterizations of the central variable. Again, in this definition we use the term ``old''. However, we argue in the following sections that an old central variable is not problematic as long as the \emph{distance} between the old, and the current central variable is small. To strengthen this intuition, let us consider Figure~\ref{fig:async_momentum} from Chapter~\ref{fig:async_momentum}. Clearly, the reason why the central variable diverges is because the straggler commits a gradient which was based on a completely different loss (position). Hypothetically, let us consider that only a single other worker committed a gradient causing the central variable to be close to a minima. If one would employ an optimizer like \textsc{dynsgd}, which uses a definition of staleness based on the number of stale \emph{steps}, the stale gradient would be scaled down by half, causing significant divergent behaviour in the central variable. However, if one would use the \emph{distance} between the current, and the old central variable, and scale the workers deltas proportionally to this distance, one is able to simply ignore the result of the straggler thus preventing divergent behaviour. This intuition is shown in Figure~\ref{fig:adag_straggler_corrected}, which incorperates the delta from the straggler into the central variable using Equation~\ref{eq:adag}.\\
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{resources/images/async_straggler_corrected_adag}
+  \caption{Correction of the stale worker delta using Equation~\ref{eq:adag}. Contrary to Figure~\ref{fig:async_momentum}, the gradient is scaled down significantly in a way it does not deteriorate the performance of the central variable.}
+  \label{fig:adag_straggler_corrected}
+\end{figure}
+
+An interesting observation from Chapter~\ref{chapter:accumulated_gradient_normalization}, is that contrary to \textsc{agn}, \textsc{aeasgd} does not show any divergent behaviour for most configurations, i.e., in terms of distributed hyperparameterizations. This is rather interesting, because it tells us that \textsc{aeasgd} has an intrinsic mechanism to deal with parameter staleness. If we review Equation~\ref{eq:aeasgd_worker}, which describes the worker update rule for $\lambda = 1$, we see the that the elastic difference, defined as $\eta_t\rho(\theta^k_t - \tilde{\theta}_t)$, incorperates the \emph{distance} between the worker parameterization $\theta^k_t$ and the \emph{current} parameterization of the central variable $\tilde{\theta}_t$. \textsc{aeasgd} uses the elastic difference as an \emph{opposing force} of the worker exploration, meaning, it limits the amount of exploration that can be done. As a result, the elastic difference of \textsc{aeasgd} in effect limits the \emph{distance} that can be covered by the worker (unless the gradients suddenly become larger). As a result, \textsc{aeasgd} serves as additional evidence for our notion that staleness should be defined in terms of \emph{distance}, and not in terms of stale steps, as formalized in Defination~\ref{def:staleness}.
+
+\begin{definition}{Staleness}
+  \label{def:staleness}
+  Given a parameterization for worker $k$ at time $t$, $\theta^k_t$, based on the central variable $\tilde{\theta}_{t - \tau}$ where $\tau$ is the number of stale steps, and a central variable at time $t$, $\tilde{\theta}_t$. Then we can define staleness as the difference (distance) between $\tilde{\theta}_t$ and $\tilde{\theta}_{t-\tau}$.
+\end{definition}
+
+Using Definition~\ref{def:staleness}, we can make the deduction that staleness is not really a problem as long as workers commit gradients based on older parameterization of the central variable, which are close to the \emph{current} central variable. This is again additional support for Hypothesis~\ref{hyp:local_optimization}, which states that workers only contribute efficiently to the central variable as they remain close to each other, i.e., the variance of the workers amount the parameter space is small.
+
+\section{Algorithm \& Update Rule}
 \label{sec:adag_algorithm}
 
-\subsection{Update rule}
-\label{sec:adag_update_rule}
+\begin{equation}
+  \label{eq:adag}
+  \tilde{\theta}_{t+1} = \tilde{\theta}_t + \ddfrac{1}{\eta_t^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2 + 1} \odot \Delta\theta^k
+\end{equation}
 
 \section{Experiments}
 \label{sec:adag_experiments}
-
-\subsection{Handwritten digit classification}
-\label{sec:adag_experiment_mnist}
-
-\subsection{Higgs event detection}
-\label{sec:adag_experiment_higgs}
-
-\subsection{Sensitivity to hyperparameters}
-\label{sec:adag_experiment_hyperparameter_sensitivity}
-
-\subsection{Sensitivity to number of parallel workers}
-\label{sec:adag_experiment_parallel_workers}
 
 \section{Future work}
 \label{sec:adag_future_work}
