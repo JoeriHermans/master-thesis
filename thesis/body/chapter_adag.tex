@@ -107,7 +107,7 @@ An additional, but important aspect that needs to be considered is how \textsc{a
   \end{algorithmic}
 \end{algorithm}
 
-However, an obvious limitation of Algorithm~\ref{algo:adag_1}.
+However, an obvious limitation of Algorithm~\ref{algo:adag_1} is the increased network usage since two parameterizations have to be shipped to the parameter server, i.e., the worker delta $\Delta\theta^k_t$ and the original central variable parameterization $\tilde{\theta}_{t - \tau}$. To reduce the network usage of Algorithm~\ref{algo:adag_1}, and thereby reducing the waiting time of the workers, we propose to let the parameter server keep track of worker pulls, i.e., whenever a worker pulls the central variable, the parameter server copies the central variable into a datastructure (for example, a hashmap), and associates the the parameterization of the central variable with the worker which requested the pull at that time. This procedure is roughly described in Algorithm~\ref{algo:adag_2}. However, we would like to note that despite the fact that Algorithm~\ref{algo:adag_2} reduces the communication costs, it increases the memory requirements proportional to the number of concurrent workers. Which as a result, might be problematic as the number of asynchronous workers is high.
 
 \begin{algorithm}[H]
   \caption{Network efficient implementation of \textsc{adag}.}
@@ -134,6 +134,14 @@ However, an obvious limitation of Algorithm~\ref{algo:adag_1}.
 
 \section{Experiments}
 \label{sec:adag_experiments}
+
+To show the effectiveness of Definition~\ref{def:staleness}, several experiments shall be conducted in the following section regarding the convergence properties of \textsc{adag}. Looking back at Chapter~\ref{chapter:accumulated_gradient_normalization}, we saw that staleness mitigation is critical in highly concurrent environments, as the staleness increases proportionally to the number of workers, as shown in Figure~\ref{fig:staleness_increasing}. Furthermore, without \textsc{adag}, we have to descrease the communication frequency even further to ensure that divergence does not occur. However, as a result of the increased amount of local exploration, parameter updates occur less frequently. Which again results in a slower convergence of the central variable, and thereby reducing the \emph{temporal efficiency} of those highly concurrent configurations compared to less concurrent configurations.
+
+\begin{figure}[H]
+  \centering
+  \caption{Stalness increasing}
+  \label{fig:staleness_increasing}
+\end{figure}
 
 \section{Future work}
 \label{sec:adag_future_work}
