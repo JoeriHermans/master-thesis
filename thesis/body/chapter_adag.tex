@@ -135,12 +135,39 @@ However, an obvious limitation of Algorithm~\ref{algo:adag_1} is the increased n
 \section{Experiments}
 \label{sec:adag_experiments}
 
-To show the effectiveness of Definition~\ref{def:staleness}, several experiments shall be conducted in the following section regarding the convergence properties of \textsc{adag}. Looking back at Chapter~\ref{chapter:accumulated_gradient_normalization}, we saw that staleness mitigation is critical in highly concurrent environments, as the staleness increases proportionally to the number of workers, as shown in Figure~\ref{fig:staleness_increasing}. Furthermore, without \textsc{adag}, we have to descrease the communication frequency even further to ensure that divergence does not occur. However, as a result of the increased amount of local exploration, parameter updates occur less frequently. Which again results in a slower convergence of the central variable, and thereby reducing the \emph{temporal efficiency} of those highly concurrent configurations compared to less concurrent configurations.
+To demonstrate the effectiveness of Definition~\ref{def:staleness}, several experiments shall be conducted in the following section regarding the convergence properties of \textsc{adag}. Looking back at Chapter~\ref{chapter:accumulated_gradient_normalization}, we saw that staleness mitigation is critical in highly concurrent environments, as the staleness increases proportionally to the number of workers, as shown in Figure~\ref{fig:staleness_increasing}. Furthermore, without \textsc{adag}, we have to descrease the communication frequency even further to ensure that divergence does not occur. However, as a result of the increased amount of local exploration, parameter updates occur less frequently. Which again results in a slower convergence of the central variable, and thereby reducing the \emph{temporal efficiency} of those highly concurrent configurations compared to less concurrent configurations.
 
 \begin{figure}[H]
   \centering
-  \caption{Stalness increasing}
+  \includegraphics[width=.5\textwidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/000000001/staleness_distribution}
+  \caption{Staleness distribution of $n = 20$. This is in accordance with the theory~\cite{implicitmomentum}, which says that $\mathbf{E}[\tau] = (n - 1)$. Note that the $x$-axis denotes the staleness in terms of stale steps.}
   \label{fig:staleness_increasing}
+\end{figure}
+
+Let us start by considering several predictive scenarios to verify this novel understanding of parameter staleness in Deep Learning, and how to deal with it, as shown in Equation~\ref{eq:adag}. First and foremost, at the start of any parameterized machine learning training procedure, a model is initialized according to some initialization strategy. Since the probability is \emph{very} low that a randomly initialized parameterization will perform well in terms of classification accuracy, we can make the assumption that the loss during the initial phase of the training will be relatively high. Furthermore, let us assume that there are $n$ workers trying to optimize the central variable in an asynchronous manner, and that \textsc{adag} is applied before incorperating the worker deltas into the central variable, i.e., scaling proportional to $n^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2$ is applied to the incoming worker delta. In this case, we can expect that during the initial phase of the training procedure only a few workers will contribute efficiently to the central variable. With this statement, we are implying that only the deltas of a small fraction of workers will not be scaled down significantly because the loss, and thereby the gradients are quite large at the start of the training procedure, in contrast to the situation when the central variable is close to an optimum. As a result, other workers will be scaled down significantly, because the parameterization on which they based their gradients on (which all workers started with), is too distant from the current central variable.\\
+
+The following prediction we make is related to the convergence of optimizers which use \textsc{adag}. First, we know that stale gradients will be scaled down significantly due to the update rule described in Equation~\ref{eq:adag}. Furthermore, since the loss is getting smaller as the training procedure goes on, the staleness is implicitly getting smaller as well.
+
+\begin{figure}[H]
+  \centering
+  % So far for file naming consistency.
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/adag_agn_scaling_overview}
+    \caption{$\eta = 0.001$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/0001/scaling_detail}
+    \caption{$\eta = 0.0001$}
+  \end{subfigure}
+  \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/00001/scaling_overview}
+    \caption{$\eta = 0.00001$}
+  \end{subfigure}
+  \caption{Predictions}
+  \label{fig:adag_predictions}
 \end{figure}
 
 \section{Future work}
