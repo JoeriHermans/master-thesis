@@ -99,7 +99,7 @@ An additional, but important aspect that needs to be considered is how \textsc{a
     \EndProcedure
     \State
     \Procedure{HandleCommit}{$k$, $\Delta\theta^w$, $\tilde{\theta}_{t - \tau_k}$}
-    \State $\tilde{\theta}_{t + 1} = \tilde{\theta} + \ddfrac{1}{\eta_t^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau_k}\|^2 + 1} \odot \Delta\theta^k_t$
+    \State $\tilde{\theta}_{t + 1} = \tilde{\theta}_t + \ddfrac{1}{\eta_t^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau_k}\|^2 + 1} \odot \Delta\theta^k_t$
     \State $t \gets t + 1$
     \EndProcedure
     \State
@@ -107,7 +107,7 @@ An additional, but important aspect that needs to be considered is how \textsc{a
   \end{algorithmic}
 \end{algorithm}
 
-However, an obvious limitation of Algorithm~\ref{algo:adag_1} is the increased network usage since two parameterizations have to be shipped to the parameter server, i.e., the worker delta $\Delta\theta^k_t$ and the original central variable parameterization $\tilde{\theta}_{t - \tau}$. To reduce the network usage of Algorithm~\ref{algo:adag_1}, and thereby reducing the waiting time of the workers, we propose to let the parameter server keep track of worker pulls, i.e., whenever a worker pulls the central variable, the parameter server copies the central variable into a datastructure (for example, a hashmap), and associates the the parameterization of the central variable with the worker which requested the pull at that time. This procedure is roughly described in Algorithm~\ref{algo:adag_2}. However, we would like to note that despite the fact that Algorithm~\ref{algo:adag_2} reduces the communication costs, it increases the memory requirements proportional to the number of concurrent workers. Which as a result, might be problematic as the number of asynchronous workers is high.
+However, an obvious limitation of Algorithm~\ref{algo:adag_1} is the increased network usage since two parameterizations have to be shipped to the parameter server, i.e., the worker delta $\Delta\theta^k_t$ and the original central variable parameterization $\tilde{\theta}_{t - \tau}$. To reduce the network usage of Algorithm~\ref{algo:adag_1}, and thereby reducing the waiting time of the workers, we propose to let the parameter server keep track of worker pulls, i.e., whenever a worker pulls the central variable, the parameter server copies the central variable into a datastructure (for example, a hashmap), and associates the the parameterization of the central variable with the worker which requested the pull at that time. This procedure is roughly described in Algorithm~\ref{algo:adag_2}. However, we would like to note that despite the fact that Algorithm~\ref{algo:adag_2} reduces the communication costs, it increases the memory requirements proportional to the number of concurrent workers, which might be problematic as the number of asynchronous workers is high.
 
 \begin{algorithm}[H]
   \caption{Network efficient implementation of \textsc{adag}.}
@@ -124,7 +124,30 @@ However, an obvious limitation of Algorithm~\ref{algo:adag_1} is the increased n
     \EndProcedure
     \State
     \Procedure{HandleCommit}{$k$, $\Delta\theta^w$}
-    \State $\tilde{\theta}_{t + 1} = \tilde{\theta} + \ddfrac{1}{\eta_t^{-1}\|\tilde{\theta}_t - m[k]\|^2 + 1} \odot \Delta\theta^k_t$
+    \State $\tilde{\theta}_{t + 1} = \tilde{\theta}_t + \ddfrac{1}{\eta_t^{-1}\|\tilde{\theta}_t - m[k]\|^2 + 1} \odot \Delta\theta^k_t$
+    \State $t \gets t + 1$
+    \EndProcedure
+    \State
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+However, there is a pratical problem in Algorithm~\ref{algo:adag_1} and Algorithm~\ref{algo:adag_2} which tends to be overlooking when viewing \textsc{adag} from a theoretical perspective. that is, both Algorithm~\ref{algo:adag_1} and Algorithm~\ref{algo:adag_2} put severe computational load on the parameter server to ensure consistency of the staleness computation when computing the scaling factor. Remember that in order to ensure staleness consistency, we lock any writes to the central variable during the time the parameter server computes the scaling factor. This induces a significant wait in other workers due to relatively heavy computations which need to be executed by the parameter server. However, taking inspiration from \textsc{aeasgd}~\cite{zhang2015deep}, we can make significant improvements regarding computationial efficiency if we loosen the consistency constraints. By doing so, we could let the workers compute the scaling factor locally, and then transmit the scaled delta to the parameter server which only has to \emph{add} the delta into the central variable. Furthermore, to reduce the network usage even more, we only pull the central variable only once, as shown in Algorithm~\ref{algo:adag_2}. Despite the fact that Algorithm~\ref{algo:adag_2} is more computationally efficient because the load is parallelized equally over all workers, it has several consistency issues. The first being that the computed scaling factor \emph{might} not reflect reality since other workers \emph{could} have committed their deltas to the parameter server between the time our worker pulled the central variable, and the committed its scaled delta. Furthermore, if this occurs, the worker will start computing gradients based on an already (slightly) stale central variable in the next iteration.
+
+\begin{algorithm}[H]
+  \caption{Network efficient, and more computational efficient implementation of \textsc{adag}. With the side-effect that we loosen the staleness consistency constraints.}
+  \label{algo:adag_2}
+  \begin{algorithmic}[1]
+    \Procedure{ADAGWorker}{$k$}
+    \State $\tilde{\theta}_\text{original} \gets \Call{Pull}$ \Comment{Keep a local copy of the central variable}
+    \State $\theta^k_t \gets \tilde{\theta}_\text{original}$
+    \State
+    \Procedure{Commit}{$\Delta\theta^w$} \Comment{Redefine \textsc{Commit} operation.}
+    \State $\tilde{\theta}_t \gets \Call{Pull}$
+    \State $\Delta\theta^k \gets \ddfrac{1}{\eta_t^{-1}\|\tilde{\theta}_t - \tilde{\theta}_\text{original}|^2 + 1} \odot \Delta\theta^k$
+    \State $\Call{SendToParameterServer}{\Delta\theta^k}$
+    \State $\tilde{\theta}_\text{original} \gets \tilde{\theta}_t$
+    \State $\theta^k_t \gets \tilde{\theta}_\text{original}$
     \State $t \gets t + 1$
     \EndProcedure
     \State
@@ -135,18 +158,20 @@ However, an obvious limitation of Algorithm~\ref{algo:adag_1} is the increased n
 \section{Experiments}
 \label{sec:adag_experiments}
 
-To demonstrate the effectiveness of Definition~\ref{def:staleness}, several experiments shall be conducted in the following section regarding the convergence properties of \textsc{adag}. Looking back at Chapter~\ref{chapter:accumulated_gradient_normalization}, we saw that staleness mitigation is critical in highly concurrent environments, as the staleness increases proportionally to the number of workers, as shown in Figure~\ref{fig:staleness_increasing}. Furthermore, without \textsc{adag}, we have to descrease the communication frequency even further to ensure that divergence does not occur. However, as a result of the increased amount of local exploration, parameter updates occur less frequently. Which again results in a slower convergence of the central variable, and thereby reducing the \emph{temporal efficiency} of those highly concurrent configurations compared to less concurrent configurations.
+To demonstrate the effectiveness of Definition~\ref{def:staleness}, several experiments shall be conducted in the following section regarding the convergence properties of \textsc{adag}. Looking back at Chapter~\ref{chapter:accumulated_gradient_normalization}, we saw that staleness mitigation is critical in highly concurrent environments, as the staleness increases proportionally to the number of workers, as shown in Figure~\ref{fig:staleness_increasing}. Furthermore, without \textsc{adag}, we have to descrease the communication frequency even further to ensure that divergence does not occur. However, as a result of the increased amount of local exploration, parameter updates occur less frequently. Which again results in a slower convergence of the central variable, and thereby reducing the \emph{temporal efficiency} of those highly concurrent configurations compared to less concurrent configurations.\\
+
+Let us start by considering several predictive scenarios to verify this novel understanding of parameter staleness in Deep Learning, and how to deal with it, as shown in Equation~\ref{eq:adag}. First and foremost, at the start of any parameterized machine learning training procedure, a model is initialized according to some initialization strategy. Since the probability is \emph{very} low that a randomly initialized parameterization will perform well in terms of classification accuracy, we can make the assumption that the loss during the initial phase of the training will be relatively high. Furthermore, let us assume that there are $n$ workers trying to optimize the central variable in an asynchronous manner, and that \textsc{adag} is applied before incorperating the worker deltas into the central variable, i.e., scaling proportional to $n^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2$ is applied to the incoming worker delta. In this case, we can expect that during the initial phase of the training procedure only a few workers will contribute efficiently to the central variable. With this statement, we are implying that only the deltas of a small fraction of workers will not be scaled down significantly because the loss, and thereby the gradients are quite large at the start of the training procedure, in contrast to the situation when the central variable is close to an optimum. As a result, other workers will be scaled down significantly, because the parameterization on which they based their gradients on (which all workers started with), is too distant from the current central variable.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=.5\textwidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/000000001/staleness_distribution}
+  \includegraphics[width=.4\textwidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/000000001/staleness_distribution}
   \caption{Staleness distribution of $n = 20$. This is in accordance with the theory~\cite{implicitmomentum}, which says that $\mathbf{E}[\tau] = (n - 1)$. Note that the $x$-axis denotes the staleness in terms of stale steps.}
   \label{fig:staleness_increasing}
 \end{figure}
 
-Let us start by considering several predictive scenarios to verify this novel understanding of parameter staleness in Deep Learning, and how to deal with it, as shown in Equation~\ref{eq:adag}. First and foremost, at the start of any parameterized machine learning training procedure, a model is initialized according to some initialization strategy. Since the probability is \emph{very} low that a randomly initialized parameterization will perform well in terms of classification accuracy, we can make the assumption that the loss during the initial phase of the training will be relatively high. Furthermore, let us assume that there are $n$ workers trying to optimize the central variable in an asynchronous manner, and that \textsc{adag} is applied before incorperating the worker deltas into the central variable, i.e., scaling proportional to $n^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2$ is applied to the incoming worker delta. In this case, we can expect that during the initial phase of the training procedure only a few workers will contribute efficiently to the central variable. With this statement, we are implying that only the deltas of a small fraction of workers will not be scaled down significantly because the loss, and thereby the gradients are quite large at the start of the training procedure, in contrast to the situation when the central variable is close to an optimum. As a result, other workers will be scaled down significantly, because the parameterization on which they based their gradients on (which all workers started with), is too distant from the current central variable.\\
+The following prediction we make is related to the convergence of optimizers which employ \textsc{adag}. First, we know that stale gradients will be scaled down significantly due to the update rule described in Equation~\ref{eq:adag}. Furthermore, since the loss is getting smaller as the training procedure goes on, staleness, in terms of Definition~\ref{def:staleness}, is implicitly getting smaller as well. As a result, if one would plot the scaling term for every worker, we should observe (on average) a decline in the scaling factor. This would imply that the distance between the central variables, and thereby the worker gradients are small. As a result, worker deltas do not have to be scaled down as much as their gradients are relatively local to the current central variable. Furthermore, in such a situation, the optimization process would benifit from more asynchronous workers since the staleness is relatively small. An additonal situation where more asynchronous workers would be benificial is on a \emph{plateau}, where the losses are very small which implies that the parameter updates are very small. In such a situation, \textsc{adag} would barely scale down the gradients. Furthermore, as the workers would ``leave'' the plateau, worker updates which are too stale would automatically be nullified.\\
 
-The following prediction we make is related to the convergence of optimizers which employ \textsc{adag}. First, we know that stale gradients will be scaled down significantly due to the update rule described in Equation~\ref{eq:adag}. Furthermore, since the loss is getting smaller as the training procedure goes on, staleness, in terms of Definition~\ref{def:staleness}, is implicitly getting smaller as well. As a result, if one would plot the scaling term for every worker, we should observe (on average) a decline in the scaling factor.
+To emperically validate these predictions, we conducted several experiments for which we know \textsc{agn} has difficulities converging, i.e., high amount of asynchrony and a high communication frequency. Furthermore, to show that Definition~\ref{def:staleness} is a better description of staleness compared to the number of steps, we will show that staleness, in number of steps, in not necessarily proportional to the scaling factor. This is a valid assumption to make since the scaling factor \emph{is} proportional to the distance between parameterizations.
 
 \begin{figure}[H]
   \centering
@@ -166,8 +191,163 @@ The following prediction we make is related to the convergence of optimizers whi
     \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/00001/scaling_overview}
     \caption{$\eta = 0.00001$}
   \end{subfigure}
-  \caption{Predictions}
+  \caption{Average scaling (of all weights) value of every worker in \textsc{adag} with respect to different learning rates. In all Subfigures we observe a significant scaling at the start of the learning procedure (loss is relatively high, as mentioned in our first prediction), while at the end of the training procedure, scaling is not very prominent because the workers converged to a minima.}
   \label{fig:adag_predictions}
+\end{figure}
+
+\newpage
+Figure~\ref{fig:adag_worker_staleness_and_scaling} shows the stale steps (top row), together with the average scaling factor (bottom row) of every worker. Since \textsc{adag} provides a per-weight scaling factor, we compute the average scaling factor by averaging all scaling factors for every trainable weight. This allows us to get a general overview of how the scaling term behaves under different values of staleness. Looking at Figure~\ref{fig:adag_worker_staleness_and_scaling}, we observe a significant scaling at the start of the optimization procedure \emph{for most workers}, thus providing evidence for our initial prediction. Furthermore, to show that the number of stale steps is not necessarily proportional to staleness in terms of distance, let us consider \emph{Worker 2} in Figure~\ref{fig:adag_worker_staleness_and_scaling} for a moment. Around parameter update step 12, a very stale update was committed to the parameter server, both in distance as in number of steps. However, other updates of \emph{Worker 2} are also quite stale compared to other workers. Yet, the scaling factor for these updates are almost equal to 0, thus indicating that the number of stale steps is not necessarily proportional to the real staleness. Of course, this begs the question why other workers for these particular update numbers have significantly lower scaling factors, while their staleness is lower as well. This can be explained by the fact that \emph{Worker 2} was significantly slower than other workers during the initial phase of the training procedure, which caused the central variable to have moved significantly towards a minima during that time. Of course, since gradients are relatively small in the neighbourhood of a minima, staleness is not actively playing a role a in the divergence of the central variable. As a result, worker gradients are not scaled down. This result can be validated by looking at \emph{Worker 8} as well, since Worker 8 behaves in a similar manner.\\
+
+Furthermore, Figure~\ref{fig:adag_worker_staleness_and_scaling} can serve as additional validation for the statement made in~\cite{implicitmomentum}, which says that $\textbf{E}[\tau] = (n - 1)$. If we look at the average staleness of all workers, we can immediately see that the \emph{expected} staleness value of the optimization process is about 20, which is the number of workers used in that particular experiment.\\
+
+Finally, we apply \textsc{adag} to solve the instability issues of \textsc{agn} in Chapter~\ref{chapter:accumulated_gradient_normalization} under highly concurrent conditions with high communication frequencies, i.e., high number of asynchronous workers with frequent parameter updates. As shown in Figure~\ref{fig:applying_adag}, we see that \textsc{agn} initially has some difficulities converging to a minima due to the increased amount of staleness and \emph{implicit momentum}~\cite{implicitmomentum}. However, when \textsc{adag} is applied, this instability is gone because \textsc{adag} scales down worker deltas proportional to the distance of the old, and current central variable.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/adag_loss_original}
+    \caption{\textsc{agn} without \textsc{adag}}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/adag_loss_corrected}
+    \caption{\textsc{agn} with \textsc{adag}}
+  \end{subfigure}
+  \caption{In this experiment we apply \textsc{agn} to the MNIST problem using 30 asynchronous workers. From Subfigure (a) we observe some divergent behaviour of the central variable during the initial phase of the training procedure. However, if we apply \textsc{adag} to \textsc{agn} in these exact same conditions, the divergent behaviour previously observed is absent due to the fact that stale worker deltas are scaled down, or even nullified. Furthermore, since the divergent behaviour is not present in Subfigure (b), \textsc{agn} with \textsc{adag} reaches convergence faster (in terms of updates).}
+  \label{fig:applying_adag}
+\end{figure}
+
+\begin{figure}
+  \centering
+  % Worker 1 till 4.
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_1}
+    \caption{Worker 1}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_2}
+    \caption{Worker 2}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_3}
+    \caption{Worker 3}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_4}
+    \caption{Worker 4}
+  \end{subfigure}
+  % Scaling 1 till 4.
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_1}
+    \caption{Scaling worker 1}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_2}
+    \caption{Scaling worker 2}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_3}
+    \caption{Scaling worker 3}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_4}
+    \caption{Scaling worker 4}
+  \end{subfigure}
+  % Worker 5 till worker 8.
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_5}
+    \caption{Worker 5}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_6}
+    \caption{Worker 6}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_7}
+    \caption{Worker 7}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_8}
+    \caption{Worker 8}
+  \end{subfigure}
+  % Scaling of worker 5 till worker 8.
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_5}
+    \caption{Scaling worker 5}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_6}
+    \caption{Scaling worker 6}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_7}
+    \caption{Scaling worker 7}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_8}
+    \caption{Scaling worker 8}
+  \end{subfigure}
+  % Worker 9 till worker 12.
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_9}
+    \caption{Worker 9}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_10}
+    \caption{Worker 10}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_11}
+    \caption{Worker 11}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/staleness/worker_12}
+    \caption{Worker 12}
+  \end{subfigure}
+  % Scaling of worker 9 till worker 12.
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_9}
+    \caption{Scaling worker 9}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_10}
+    \caption{Scaling worker 10}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_11}
+    \caption{Scaling worker 11}
+  \end{subfigure}
+  \begin{subfigure}{.24\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/plots/adag_agn_mnist/epoch_40/15/001/scaling/worker_12}
+    \caption{Scaling worker 12}
+  \end{subfigure}
+  \caption{Worker staleness and scaling factor of Worker 1 till Worker 12. In the top row, we show the number of stale steps between every parameter update. Whereas in the bottom row, we show the scaling factor corresponding to the same parameter update step.}
+  \label{fig:adag_worker_staleness_and_scaling}
 \end{figure}
 
 \section{Future work}
