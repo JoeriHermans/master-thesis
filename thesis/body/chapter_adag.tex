@@ -218,6 +218,15 @@ Finally, we apply \textsc{adag} to solve the instability issues of \textsc{agn} 
   \label{fig:applying_adag}
 \end{figure}
 
+However, scaling worker deltas according to Equation~\ref{eq:adag} might be rather simplistic. Nevertheless, \textsc{adag} is effective despite the fact that there might be a better technique. Furthermore, during our experimentation with \textsc{adag}, we found that especially in high staleness environments, Equation~\ref{eq:adag_agn_worker} is not really effective due to the relatively large learning rate, as shown in Figure~\ref{fig:applying_adag}. Therefore, we introduce a hyperparameter $\gamma$, which controls the scale at which the gradients operate. As a result, we can rewrite Equation~\ref{eq:adag} as Equation~\ref{eq:adag_rewrite}. In our experiments, $\gamma$ is usually defined as 0.0001. However, if the loss still shows \emph{significant} divergent behaviour, we recommend to reduce the value of $\gamma$ even further.
+
+\begin{equation}
+  \label{eq:adag_rewrite}
+  \tilde{\theta}_{t+1} = \tilde{\theta}_t + \ddfrac{1}{\gamma^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2 + 1} \odot \Delta\theta^k
+\end{equation}
+
+This indicates that there must to be a more intelligent way to define $\gamma$. However, due to the time-constraints, this is not considered in this thesis.
+
 \begin{figure}
   \centering
   % Worker 1 till 4.
@@ -364,7 +373,7 @@ However, as discussed in Chapter~\ref{chapter:accumulated_gradient_normalization
 
 \begin{equation}
   \label{eq:adag_agn_worker}
-  \Delta\theta^k = -\ddfrac{1}{\eta^{-1}_t\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2 + 1} \odot \frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_j^{m - 1} \nabla_\theta \mathcal{L}(\theta^k_i;\mathbf{x}_i;\mathbf{y}_i) }{\lambda}
+  \Delta\theta^k = -\ddfrac{1}{\gamma^{-1}\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2 + 1} \odot \frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_j^{m - 1} \nabla_\theta \mathcal{L}(\theta^k_i;\mathbf{x}_i;\mathbf{y}_i) }{\lambda}
 \end{equation}
 
 \begin{equation}
