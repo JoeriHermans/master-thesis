@@ -120,7 +120,7 @@ def run_experiment(t):
     model = construct_model()
     # Allocate the AGN optimizer.
     optimizer = Experimental(keras_model=model, worker_optimizer='adam', loss='categorical_crossentropy', num_workers=num_workers,
-                             batch_size=128, communication_window=communication_frequency, num_epoch=40, learning_rate=0.001,
+                             batch_size=128, communication_window=communication_frequency, num_epoch=40, learning_rate=0.0001,
                              features_col="features_normalized_dense", label_col="label_encoded")
     # Collect the training data, and train the model.
     trained_model = optimizer.train(training_set)
@@ -150,8 +150,8 @@ def main():
     # Allocate a data dictionary to store experimental results.
     data = {}
     # Set the hyperparameters that need to be tested.
-    workers = np.arange(20, 41, 5) # 10, 15, 20, 25, 30, 35, 40
-    lambdas = np.arange(10, 21, 5) # 5. 10, 15, 20, 25, 30, ...
+    workers = np.asarray([20, 30, 40])
+    lambdas = np.asarray([20])
     for w in workers:
         data[w] = {}
         for l in lambdas:
