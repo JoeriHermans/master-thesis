@@ -10,7 +10,7 @@
 \chapter{Asynchronous Distributed Adaptive Gradients}
 \label{chapter:asynchronous_distributed_adaptive_gradients}
 
-In this chapter we introduce a novel optimizer called \textsc{adag}. \textsc{adag}, or \emph{Asynchronous Distributed Adaptive Gradients}, is an optimization process designed with data parallel methods in mind. We build upon previous work~\cite{dean2012large,hadjis2016omnivore,kingma2014adam,zhang2015deep,jiang2017heterogeneity} and incorperate new insights backed up by theory and experimental evidence. We start in Section~\ref{sec:adag_problem_setting} by formalizing the problem setting. Section~\ref{sec:adag_algorithm} describes our algorithm in detail, supported by intuition and theory. Finally, we experimentally show the effectiveness of our approach in Section~\ref{sec:adag_experiments} and give some points for future work in Section~\ref{sec:adag_future_work}.
+In this chapter we introduce a novel optimizer called \textsc{adag}. \textsc{adag}, or \emph{Asynchronous Distributed Adaptive Gradients}, is an optimization process designed with data parallel methods in mind. We build upon previous work~\cite{dean2012large,hadjis2016omnivore,kingma2014adam,zhang2015deep,jiang2017heterogeneity} and incorperate new insights backed up by theory and experimental evidence. We start in Section~\ref{sec:adag_problem_setting} by formalizing the problem setting. Section~\ref{sec:adag_algorithm} describes our algorithm in detail, supported by intuition and theory. Finally, we experimentally show the effectiveness of our approach in Section~\ref{sec:adag_experiments} and give some points for future work in Section~\ref{sec:adag_discussion}.
 
 \section{Problem setting}
 \label{sec:adag_problem_setting}
@@ -132,11 +132,11 @@ However, an obvious limitation of Algorithm~\ref{algo:adag_1} is the increased n
   \end{algorithmic}
 \end{algorithm}
 
-However, there is a pratical problem in Algorithm~\ref{algo:adag_1} and Algorithm~\ref{algo:adag_2} which tends to be overlooking when viewing \textsc{adag} from a theoretical perspective. that is, both Algorithm~\ref{algo:adag_1} and Algorithm~\ref{algo:adag_2} put severe computational load on the parameter server to ensure consistency of the staleness computation when computing the scaling factor. Remember that in order to ensure staleness consistency, we lock any writes to the central variable during the time the parameter server computes the scaling factor. This induces a significant wait in other workers due to relatively heavy computations which need to be executed by the parameter server. However, taking inspiration from \textsc{aeasgd}~\cite{zhang2015deep}, we can make significant improvements regarding computationial efficiency if we loosen the consistency constraints. By doing so, we could let the workers compute the scaling factor locally, and then transmit the scaled delta to the parameter server which only has to \emph{add} the delta into the central variable. Furthermore, to reduce the network usage even more, we only pull the central variable only once, as shown in Algorithm~\ref{algo:adag_2}. Despite the fact that Algorithm~\ref{algo:adag_2} is more computationally efficient because the load is parallelized equally over all workers, it has several consistency issues. The first being that the computed scaling factor \emph{might} not reflect reality since other workers \emph{could} have committed their deltas to the parameter server between the time our worker pulled the central variable, and the committed its scaled delta. Furthermore, if this occurs, the worker will start computing gradients based on an already (slightly) stale central variable in the next iteration.
+However, there is a pratical problem in Algorithm~\ref{algo:adag_1} and Algorithm~\ref{algo:adag_2} which tends to be overlooking when viewing \textsc{adag} from a theoretical perspective. that is, both Algorithm~\ref{algo:adag_1} and Algorithm~\ref{algo:adag_2} put severe computational load on the parameter server to ensure consistency of the staleness computation when computing the scaling factor. Remember that in order to ensure staleness consistency, we lock any writes to the central variable during the time the parameter server computes the scaling factor. This induces a significant wait in other workers due to relatively heavy computations which need to be executed by the parameter server. However, taking inspiration from \textsc{aeasgd}~\cite{zhang2015deep}, we can make significant improvements regarding computationial efficiency if we loosen the consistency constraints. By doing so, we could let the workers compute the scaling factor locally, and then transmit the scaled delta to the parameter server which only has to \emph{add} the delta into the central variable. Furthermore, to reduce the network usage even more, we only pull the central variable only once, as shown in Algorithm~\ref{algo:adag_3}. Despite the fact that Algorithm~\ref{algo:adag_3} is more computationally efficient because the load is parallelized equally over all workers, it has several consistency issues. The first being that the computed scaling factor \emph{might} not reflect reality since other workers \emph{could} have committed their deltas to the parameter server between the time our worker pulled the central variable, and the committed its scaled delta. Furthermore, if this occurs, the worker will start computing gradients based on an already (slightly) stale central variable in the next iteration.
 
 \begin{algorithm}[H]
   \caption{Network efficient, and more computational efficient implementation of \textsc{adag}. With the side-effect that we loosen the staleness consistency constraints.}
-  \label{algo:adag_2}
+  \label{algo:adag_3}
   \begin{algorithmic}[1]
     \Procedure{ADAGWorker}{$k$}
     \State $\tilde{\theta}_\text{original} \gets \Call{Pull}$ \Comment{Keep a local copy of the central variable}
@@ -350,5 +350,26 @@ Finally, we apply \textsc{adag} to solve the instability issues of \textsc{agn} 
   \label{fig:adag_worker_staleness_and_scaling}
 \end{figure}
 
-\section{Future work}
-\label{sec:adag_future_work}
+\section{Discussion}
+\label{sec:adag_discussion}
+
+Using our knowledge from previous Chapters, we are finally able to construct a distributed gradient-based optimization procedure which is able to handle practical constraints, such as communication costs). Furthermore, by reducing the communication frequency, we increase the amount of computational time that can be spent to produce a better gradient in contrast first order gradients. However, a reduced communication frequency had a significant impact on the convergence rate of the central variable. Therefore, two options are possible:
+
+\begin{itemize}
+\item Increase the communication frequency.
+\item Increase the number of asynchronous workers.
+\end{itemize}
+
+However, as discussed in Chapter~\ref{chapter:accumulated_gradient_normalization}, increasing the communication frequency causes divergent behaviour when a relatively large number of asynchronous workers is present in the optimization process due to the staleness that is inserted. Then, in Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients}, we introduced a novel understanding of parameter staleness in terms of distance between the old, and the current central variable. Using this understanding, a per-weight scaling term was constructed, \textsc{adag}, which automatically scales stale worker deltas down, or even nullifies them proportional to the staleness of the old central variable, thus preventing divergent behaviour of the central variable. Furthermore, since the scaling term is applied dynamically, a training procedure would automatically benefit from increased parallelism in small loss environments, as workers which were significantly scaled down initially due to the relatively higher loss, will now commit gradients with a larger magnitude, which accelerates the training procedure.
+
+\begin{equation}
+  \label{eq:adag_agn_worker}
+  \Delta\theta^k = -\ddfrac{1}{\eta^{-1}_t\|\tilde{\theta}_t - \tilde{\theta}_{t - \tau}\|^2 + 1} \odot \frac{\sum_{i = 0}^\lambda \eta_t \frac{1}{m}\sum_j^{m - 1} \nabla_\theta \mathcal{L}(\theta^k_i;\mathbf{x}_i;\mathbf{y}_i) }{\lambda}
+\end{equation}
+
+\begin{equation}
+  \label{eq:adag_agn_ps}
+  \tilde{\theta}_{t+1} = \tilde{\theta}_t + \Delta\theta^k
+\end{equation}
+
+Using the intuition layed out above, we will now formalize the procedure described in Eqation~\ref{eq:adag_agn_worker} and Equation~\ref{eq:adag_agn_ps}. To optimize the throughput of the training procedure, in terms of samples per second. We recommend (in the most complex scenario), distributed mini-batch parallelism, followed by an asynchronous approach using \textsc{adag-agn} to optimize a central variable. Nevertheless, this might be a very complex system. However, this can be simplified significantly for other, less requiring use-cases. For instance, one could simply perform mini-batch parallelism locally by, e.g., distributing the workload over several CPU cores, or even GPUs. Then, once the \textsc{agn} gradient, and \textsc{adag} scaling term from Algorithm~\ref{algo:adag_3} are computed, the worker deltas can be sent asynchronously to the parameter server using Equation~\ref{eq:adag_agn_ps}.
