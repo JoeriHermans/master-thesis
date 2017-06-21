@@ -28,8 +28,8 @@ In general, a \emph{dist-keras} workflow proceeds as follows. Initially, a Keras
 
 \begin{figure}[H]
   \centering
-  %\includegraphics[width=.8\textwidth]{}
-  \caption{dist-keras something something}
+  \includegraphics[width=.8\textwidth]{resources/images/dist-keras}
+  \caption{Architecture of Distributed Keras and assigned roles during a distributed optimization procedure. As stated before, the Spark Driver will spawn the parameter server on the same machine. However, since our parameter server implementation does not have any Spark dependencies, it can in principle be spawned on any cluster machine.}
   \label{fig:dist_keras_architecture}
 \end{figure}
 
