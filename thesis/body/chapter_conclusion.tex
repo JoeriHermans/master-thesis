@@ -26,23 +26,29 @@ Finally, we introduced and described the experimental setup~\cite{dist_keras} in
 In Section~\ref{sec:problem_statement}, we posed several Research Questions which guided the work conducted in this thesis. Using the knowledge gained by researching this topic, those questions can now be answered.\\
 
 \noindent \textbf{Research Question 1.}\\
-When do workers contribute positively to the central variable during training?\\
+\emph{When do workers contribute positively to the central variable during training?}\\
 
 Using our new definition of staleness in parameterized settings, and the fact that \emph{implicit momentum}~\cite{implicitmomentum} follows from parameter staleness, a worker contribution is positive when the distance between the old central variable, which the worker used to compute its commit, and the current central variable is small. However, as shown in Chapter~\ref{chapter:accumulated_gradient_normalization}, staleness in terms of parameter distance is not really an issue if a better \emph{direction} to a minima is provided.\\
 
 To deal with parameter staleness in a highly concurrent configuration, we introduced \textsc{adag} to construct a per-weight scaling factor which would scale a delta down proportional to the distance of the old, and new central variable. Which resulted in a more stable convergence rate of the central variable due to the automatic scaling of updates from stale workers. Furthermore, in the case that staleness becomes less of an issue over time, possibly due to the existance of a plateau or a minima, workers which were scaled significantly before due to staleness, will now contribute positively to the central variable. Thus, reaching the minima faster due to an \emph{implicit} increase in asynchrony.\\
 
 \noindent \textbf{Research Question 2.}\\
-Why does asynchronous \textsc{easgd} diverge when a small communication frequency is used, and converges with a large communication frequency?\\
+\emph{Why does asynchronous \textsc{easgd} diverge when a small communication frequency is used, and converges with a large communication frequency?}\\
 
 Using \emph{dist-keras}~\cite{dist_keras}, and even in simulations, we sometimes observed divergent behaviour of \textsc{aeasgd}. After several experiment, we concluded that this instability is induced by a numerical error when the difference between the old central variable, and current central variable is relatively large (stale). In additon, if an \textsc{aeasgd} worker commits a very stale \emph{elastic difference} to the parameter server, it causes other workers to be very stale as well because workers in \textsc{easgd} do not \emph{synchronize} with the central variable. Thus, causing the divergent behaviour. However, this could be corrected with \textsc{adag}, with the disadvantage of an increased computational cost.\\
 
 \noindent \textbf{Research Question 3.}\\
-What is the nature of staleness in parameterized settings?\\
+\emph{What is the nature of staleness in parameterized settings?}\\
 
 According to Definition~\ref{def:staleness}, staleness in parameterized settings can be defined as: \emph{Given a parameterization for worker $k$ at time $t$, $\theta^k_t$, based on the central variable $\tilde{\theta}_{t - \tau}$ where $\tau$ is the number of stale steps, and a central variable at time $t$, $\tilde{\theta}_t$. Then, staleness is defined as the difference (distance) between $\tilde{\theta}_t$ and $\tilde{\theta}_{t-\tau}$}.
 
 \section{Future Work}
 \label{sec:conclusion_future_work}
 
-To conclude this thesis, several interesting points have come up that could be addressed in future work.
+To conclude this thesis, several interesting points came up during this work that could be addressed in future work:\\
+
+An initial point that could be addressed is to provide a better understanding how $\gamma$ should be defined in \textsc{adag}. A lower $\gamma$ is usually correlated with a higher amount of concurrency in the optimization procedure. Therefore it might be related to \emph{implicit momentum}, as on average, per time-unit, the central variable traversed a larger distance in the parameter space compared to a smallar amount of concurrent workers.\\
+
+To further improve \textsc{adag}, and possibly reduce to computational complexity, we could take inspiration from the \emph{elastic difference} in \textsc{aeasgd}, and modify it in such a way that the term could be used to combat staleness in \textsc{agn}.\\
+
+Practical and performant system architectures are also an important aspect that needs to be addressed to improve the convergence rate of a central variable. Therefore, some work has to be done to construct a performant system architecture which is able to deal with failures, and large datascales, i.e., peta- or even exabyte scale. Data scale is also an additional issue that is mostly forgotten about, or regarded as a \emph{technical} issue. For example, consider a multi-epoch training procedure on petabyte scale, do we congest the network by sending the training data multiple times over the network, or do we cache some locally? Furthermore, in most cases the data has to be reshaped into a format a model can work with. How do we accomplish this, do we transform the data on the fly (multiple epochs, network cost, computation cost), or do we transform all data once, and store them elsewhere (storage cost). However, to understand asynchronous gradient descent even better, working on such systems might provide additional insights that can be used to solve other issues in non-distributed settings, and even solve problems in computer engineering fields.
