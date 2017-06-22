@@ -645,6 +645,15 @@ As stated above, being able to train a model on a vast amount of data generally 
 \label{fig:problem_statement_particles}
 \end{figure}
 
+\newpage
+Finally, to guide our study of parallelizing gradient descent, we propose the following research questions:\\
+
+\noindent \textbf{Research Question 1.}\\When do workers contribute positively to the central variable during training?\\
+
+\noindent \textbf{Research Question 2.}\\Why does asynchronous \textsc{easgd} diverge when a small communication frequency is used, and converges with a large communication frequency?\\
+
+\noindent \textbf{Research Question 3.}\\What is the nature of staleness in parameterized settings?
+
 \section{Thesis Outline}
 \label{sec:thesis_outline}
 
@@ -660,14 +669,4 @@ In Chapter~\ref{chapter:asynchronous_distributed_adaptive_gradients} we introduc
 
 When all theory has been presented, we validate our results and hypotheses by performing some experiments on traditional datasets such as MNIST, and CIFAR to have a baseline comparison to validate against different methods. But also on CERN-specific problems, such as track reconstruction as mentioned in Section~\ref{sec:problem_statement}.\\
 
-Finally, we conclude the thesis in Chapter~\ref{chapter:conclusion} by summarizing the contributions that have been made, and the empirical results from our experiments.\\
-
-\vspace{2cm}
-
-\noindent We use the following research questions to guide our study of parallelizing gradient descent:
-
-\begin{enumerate}
-  \item When do workers contribute positively to the central variable during training?
-  \item Why does asynchronous EASGD diverge when a small communication frequency is used, and converges with a large communication frequency?
-  \item Why does \emph{Accumulated Gradient Normalization} converge faster, compared to equivalently sized mini-batches?
-\end{enumerate}
+Finally, we conclude the thesis in Chapter~\ref{chapter:conclusion} by summarizing the contributions that have been made, and the empirical results from our experiments.
