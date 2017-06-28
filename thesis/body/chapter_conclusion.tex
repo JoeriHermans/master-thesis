@@ -20,6 +20,37 @@ In addition, as the number of asynchronous workers was increased in \textsc{agn}
 
 Finally, we introduced and described the experimental setup~\cite{dist_keras} in Chapter~\ref{chapter:experiments}. We constructed the experimental framework, \emph{dist-keras}, to serve several purposes. However, the main focus of this framework is on distributed optimization. To accomplish this, the programming interface was simplified with the purpose to easily implement new distributed optimizers. In addition, since validation and other training metrics can be computed on different nodes in parallel with ease, because of the provided utility classes, a better statistic of a model can be obtained by simply increasing the amount of validation data.
 
+\section{Contributions}
+\label{sec:conclusion_contributions}
+
+This Section summarizes the contributions of this work, and their empirical validation. First, we examined existing distributed optimization algorithms such as \textsc{downpour}~\cite{dean2012large}, \textsc{easgd}~\cite{zhang2015deep}, and \textsc{dynsgd}~\cite{jiang2017heterogeneity}. As previously shown, we validate the result that \textsc{downpour}~\cite{dean2012large} becomes very unstable as the number of parallel workers increases~\cite{implicitmomentum, hadjis2016omnivore}. To combat this, and to solve the communication constraints,~\cite{zhang2015deep} proposes \textsc{(a)easgd}. Again, we validate the claim of the authors that \textsc{aeasgd} performs better when a low communication frequency is used. However, we showed in Chapter~\ref{chapter:distributed_deep_learning} that due to the \emph{elastic difference} mechanism an equilibrium condition occurs which impairs the convergence rate of \textsc{(a)easgd}, shown in Figure~\ref{fig:conclusion_equilibrium_early_stopping}. Furthermore, when \textsc{(a)easgd} approaches an equilibrium, additional local computations are in essence \emph{wasted}, since they won't push the equilibrium boundary any further because the elastic difference between the worker and the central variable is too large, i.e., worker and central variable are too distant. As a result, one could prevent the waste of computational resources by implementing an \emph{early stopping} mechanism whenever a worker approaches an equilibrium condition. This means whenever Equation~\ref{eq:easgd_equilibrium_fix} is satisfied, or when the communication frequency of the worker is expired, the elastic difference is communicated with the parameter server. This has the desired effect that the convergence rate of the central variable is drastically improved, given the fact that the network and the implementation is able to handle the increased bandwith consumption.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_space.png}
+    \caption{Equilibrium, no early stopping.}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_sync_norm_equilibrium.png}
+    \caption{Equilibrium, no early stopping.}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_50_y}
+    \caption{Equilibrium, early stopping.}
+  \end{subfigure}
+  \begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/easgd_es_50_y_eq}
+    \caption{Equilibrium, early stopping.}
+  \end{subfigure}
+  \caption{Equilibrium condition of \textsc{(a)easgd} described in Section~\ref{sec:easgd}. To improve the convergence rate of \textsc{easgd}, we propose an early stopping mechanism which is triggered when a worker is approaching an equilibrium condition.}
+  \label{fig:conclusion_equilibrium_early_stopping}
+\end{figure}
+
 \section{Research Questions}
 \label{sec:conclusion_research_questions}
 
