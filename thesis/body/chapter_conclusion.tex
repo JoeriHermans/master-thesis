@@ -34,6 +34,7 @@ However, as we increase the number of asynchronous workers in the optimizers dis
 \item Redefinition of parameter staleness in terms of distance between two parameterizations.
 \item Two novel mechanisms, \textsc{agn} and \textsc{adag}, with state-of-the-art performance and robustness against (distributed) hyperparameterization.
 \item A novel evaluation metric, \emph{temporal efficiency}, which also takes the stability of the convergence into account, which is important in distributed optimization due to the presence of parameter staleness.
+\item Asynchronous optimization really benifits close to an minima, since our definition of parameter staleness says that staleness is small.
 \end{itemize}
 
 \begin{figure}

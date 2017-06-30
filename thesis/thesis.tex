@@ -86,26 +86,25 @@
 \begin{document}
 
 % Load the nomenclature.
-\input{nomenclature}
+\input{nomenclature.tex}
 
 % Start front matter.
 \frontmatter
 \let\cleardoublepage\clearpage
-\input{head/cover_page}
-%\input{head/dedication}
-\input{head/preface}
-\input{head/abstract}
+\input{head/cover_page.tex}
+\input{head/preface.tex}
+\input{head/abstract.tex}
 \tableofcontents
 \printnomenclature[3cm]
 
 % Start main matter.
 \mainmatter
-\input{body/chapter_introduction}
-\input{body/chapter_distributed_deep_learning}
-\input{body/chapter_accumulated_gradient_normalization}
-\input{body/chapter_adag}
-\input{body/chapter_experiments}
-\input{body/chapter_conclusion}
+\input{body/chapter_introduction.tex}
+\input{body/chapter_distributed_deep_learning.tex}
+\input{body/chapter_accumulated_gradient_normalization.tex}
+\input{body/chapter_adag.tex}
+\input{body/chapter_experiments.tex}
+\input{body/chapter_conclusion.tex}
 
 % Force the bibliography on a new page.
 \clearpage
@@ -122,6 +121,24 @@
 
 \section{Dataset}
 \label{appendix:mnist_dataset}
+
+The MNIST dataset~\cite{mnist}, is a collection of labeled handwritten digits. Basically, the objective here is to classificy a certain input image with associate it with the corresponding natural number. A data instance consists of 768 gray-scaled pixels, each ranging between 0 and 255.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{.40\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/mnist_1}
+    \caption{No preprocessing}
+  \end{subfigure}
+  \begin{subfigure}{.40\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{resources/images/mnist_2}
+    \caption{Preprocessed}
+  \end{subfigure}
+  \caption{MNIST training instances. Subfigure (a) shows an unprocessed samples, meaning, their pixel values range between 0 and 255. Whereas Subfigure (b) is preprocessed, i.e., every pixel value is mapped to a range between 0 and 1.}
+  \label{fig:mnist}
+\end{figure}
 
 \section{Model}
 \label{appendix:mnist_model}
